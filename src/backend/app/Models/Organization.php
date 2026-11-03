@@ -1,0 +1,129 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
+
+class Organization extends Model
+{
+    use HasFactory;
+
+    protected $fillable = ['name', 'slug', 'description', 'timezone', 'industry', 'website', 'created_by'];
+
+    protected function casts(): array
+    {
+        return ['onboarding_completed_at' => 'datetime'];
+    }
+
+    public static function uniqueSlug(string $name): string
+    {
+        $base = Str::limit(Str::slug($name) ?: 'workspace', 60, '');
+        $slug = $base;
+        $i = 1;
+        while (static::where('slug', $slug)->exists()) {
+            $slug = $base.'-'.(++$i);
+        }
+
+        return $slug;
+    }
+
+    public function memberships(): HasMany
+    {
+        return $this->hasMany(OrganizationMembership::class);
+    }
+
+    public function activeMemberships(): HasMany
+    {
+        return $this->memberships()->where('status', OrganizationMembership::STATUS_ACTIVE);
+    }
+
+    public function members(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'organization_memberships')
+            ->withPivot(['role', 'status'])
+            ->wherePivot('status', OrganizationMembership::STATUS_ACTIVE);
+    }
+
+    public function departments(): HasMany
+    {
+        return $this->hasMany(Department::class);
+    }
+
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(Invitation::class);
+    }
+
+    public function projects(): HasMany
+    {
+        return $this->hasMany(Project::class);
+    }
+
+    public function tasks(): HasMany
+    {
+        return $this->hasMany(Task::class);
+    }
+
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(Conversation::class);
+    }
+
+    public function messages(): HasMany
+    {
+        return $this->hasMany(Message::class);
+    }
+
+    public function events(): HasMany
+    {
+        return $this->hasMany(Event::class);
+    }
+
+    public function announcements(): HasMany
+    {
+        return $this->hasMany(Announcement::class);
+    }
+
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(Attachment::class);
+    }
+
+    public function activities(): HasMany
+    {
+        return $this->hasMany(Activity::class);
+    }
+
+    public function logoUrl(): ?string
+    {
+        return $this->logo_path
+            ? url('/api/orgs/'.$this->slug.'/logo?v='.substr(md5($this->logo_path), 0, 8))
+            : null;
+    }
+
+    /** True when the user is an active member of this organisation. */
+    public function hasActiveMember(int $userId): bool
+    {
+        return $this->activeMemberships()->where('user_id', $userId)->exists();
+    }
+
+    /**
+     * Filters the given user IDs down to active members of this organisation.
+     *
+     * @param  array<int|string>  $userIds
+     * @return list<int>
+     */
+    public function filterActiveMemberIds(array $userIds): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $userIds)));
+        if ($ids === []) {
+            return [];
+        }
+
+        return $this->activeMemberships()->whereIn('user_id', $ids)->pluck('user_id')->map(fn ($id) => (int) $id)->all();
+    }
+}
