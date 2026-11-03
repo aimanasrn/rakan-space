@@ -2,17 +2,27 @@
 
 namespace App\Support;
 
+use App\Enums\AppAbility;
 use App\Enums\Role;
 use App\Models\Announcement;
+use App\Models\AppRolePermission;
+use App\Models\Approval\ApprovalRequest;
+use App\Models\Approval\ApprovalStepApprover;
 use App\Models\Attachment;
 use App\Models\Conversation;
 use App\Models\Event;
+use App\Models\Form\Form;
+use App\Models\Form\FormSubmission;
+use App\Models\LauncherApp;
+use App\Models\LauncherBanner;
 use App\Models\Message;
+use App\Models\OrganizationApp;
 use App\Models\OrganizationMembership;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Single source of truth for resource-level access rules.
@@ -345,6 +355,7 @@ class Permissions
             $parent instanceof Task => self::canViewTask($user, $parent),
             $parent instanceof Project => self::canViewProject($user, $parent),
             $parent instanceof Announcement => self::canViewAnnouncement($user, $parent),
+            $parent instanceof FormSubmission => self::canViewSubmission($user, $parent),
             default => false,
         };
     }
@@ -367,6 +378,296 @@ class Permissions
             $parent instanceof Announcement => self::canManageAnnouncement($user, $parent),
             default => false,
         };
+    }
+
+    // -------------------------------------------------------------------- Apps
+    //
+    // App abilities only cover the app's own data. They never open private
+    // channels, direct messages or private events.
+
+    /** Owners and Admins install apps, set app permissions and manage banners. */
+    public static function canManageApps(User $user, int $organizationId): bool
+    {
+        return self::isAdmin($user, $organizationId);
+    }
+
+    /**
+     * The user's abilities in every app installed for the organisation, keyed by
+     * app id. Apps that are not installed, or where the role has no abilities,
+     * are left out.
+     *
+     * @return array<int, list<string>>
+     */
+    public static function appAbilitiesMap(User $user, int $organizationId): array
+    {
+        // Memoised per HTTP request only (a new request always re-reads permissions).
+        $request = app()->bound('request') ? app('request') : null;
+        $memoKey = 'app-abilities:'.$user->id.':'.$organizationId;
+        if ($request?->attributes->has($memoKey)) {
+            return $request->attributes->get($memoKey);
+        }
+        $map = self::computeAppAbilitiesMap($user, $organizationId);
+        $request?->attributes->set($memoKey, $map);
+
+        return $map;
+    }
+
+    /** Forget memoised abilities after changing installs or app permissions mid-request. */
+    public static function forgetAppAbilities(): void
+    {
+        $request = app()->bound('request') ? app('request') : null;
+        foreach (array_keys($request?->attributes->all() ?? []) as $key) {
+            if (str_starts_with($key, 'app-abilities:')) {
+                $request->attributes->remove($key);
+            }
+        }
+    }
+
+    /** @return array<int, list<string>> */
+    private static function computeAppAbilitiesMap(User $user, int $organizationId): array
+    {
+        $role = self::role($user, $organizationId);
+        if (! $role) {
+            return [];
+        }
+
+        $installed = OrganizationApp::where('organization_id', $organizationId)
+            ->join('apps', 'apps.id', '=', 'organization_apps.app_id')
+            ->pluck('apps.key', 'organization_apps.app_id');
+        $overrides = in_array($role, AppCatalog::configurableRoles(), true)
+            ? AppRolePermission::where('organization_id', $organizationId)->where('role', $role->value)->pluck('abilities', 'app_id')
+            : collect();
+
+        $map = [];
+        foreach ($installed as $appId => $appKey) {
+            $abilities = $overrides->has($appId)
+                ? AppAbility::normalize($overrides[$appId] ?? [])
+                : AppCatalog::defaultAbilities($role, $appKey);
+            if ($abilities !== []) {
+                $map[(int) $appId] = $abilities;
+            }
+        }
+
+        return $map;
+    }
+
+    /** @return list<string> */
+    public static function appAbilities(User $user, int $organizationId, LauncherApp $app): array
+    {
+        return self::appAbilitiesMap($user, $organizationId)[$app->id] ?? [];
+    }
+
+    public static function canUseApp(User $user, int $organizationId, LauncherApp $app, AppAbility $ability = AppAbility::View): bool
+    {
+        return in_array($ability->value, self::appAbilities($user, $organizationId, $app), true);
+    }
+
+    /**
+     * Abilities in an app by key ([] when not installed or not allowed).
+     *
+     * @return list<string>
+     */
+    public static function appAbilitiesFor(User $user, int $organizationId, string $appKey): array
+    {
+        $id = LauncherApp::where('key', $appKey)->value('id');
+
+        return $id ? (self::appAbilitiesMap($user, $organizationId)[$id] ?? []) : [];
+    }
+
+    public static function hasAppAbility(User $user, int $organizationId, string $appKey, AppAbility $ability = AppAbility::View): bool
+    {
+        return in_array($ability->value, self::appAbilitiesFor($user, $organizationId, $appKey), true);
+    }
+
+    /** Banners shown to members: active and inside their start/end window. */
+    public static function visibleBannersQuery(User $user, int $organizationId): Builder
+    {
+        $query = LauncherBanner::query()->where('organization_id', $organizationId);
+        if (! self::membership($user, $organizationId)) {
+            return $query->whereRaw('false');
+        }
+
+        return $query->where('is_active', true)
+            ->where(fn (Builder $q) => $q->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
+            ->where(fn (Builder $q) => $q->whereNull('ends_at')->orWhere('ends_at', '>', now()));
+    }
+
+    public static function canViewBanner(User $user, LauncherBanner $banner): bool
+    {
+        if (! self::membership($user, $banner->organization_id)) {
+            return false;
+        }
+
+        return $banner->isLive() || self::canManageApps($user, $banner->organization_id);
+    }
+
+    // --------------------------------------------------------------- Approvals
+    //
+    // A request is visible to its requester, to anyone who is or was an approver
+    // on it (including the person who delegated), and to members with the
+    // Approval app's "admin" ability. Approvers do not need the app itself.
+
+    public static function canManageApprovalWorkflows(User $user, int $organizationId): bool
+    {
+        return self::hasAppAbility($user, $organizationId, 'approval', AppAbility::Admin);
+    }
+
+    public static function canViewApprovalRequest(User $user, ApprovalRequest $request): bool
+    {
+        if (! self::membership($user, $request->organization_id)) {
+            return false;
+        }
+        if ($request->requester_id === $user->id) {
+            return true;
+        }
+
+        return ApprovalStepApprover::where('approval_request_id', $request->id)
+            ->where(fn (Builder $q) => $q->where('user_id', $user->id)->orWhere('delegated_from', $user->id))
+            ->exists()
+            || self::canManageApprovalWorkflows($user, $request->organization_id);
+    }
+
+    public static function visibleApprovalRequestsQuery(User $user, int $organizationId): Builder
+    {
+        $query = ApprovalRequest::query()->where('approval_requests.organization_id', $organizationId);
+        if (! self::membership($user, $organizationId)) {
+            return $query->whereRaw('false');
+        }
+        if (self::canManageApprovalWorkflows($user, $organizationId)) {
+            return $query;
+        }
+
+        return $query->where(fn (Builder $q) => $q
+            ->where('approval_requests.requester_id', $user->id)
+            ->orWhereExists(fn ($sub) => $sub->selectRaw('1')->from('approval_step_approvers')
+                ->whereColumn('approval_step_approvers.approval_request_id', 'approval_requests.id')
+                ->where(fn ($w) => $w->where('approval_step_approvers.user_id', $user->id)->orWhere('approval_step_approvers.delegated_from', $user->id))));
+    }
+
+    // ------------------------------------------------------------------- Forms
+    //
+    // Form app abilities: view = fill forms available to you and see your own
+    // submissions; create = build forms (and manage your own); edit = manage
+    // every form; delete = delete any form; admin = see every submission.
+
+    public static function canBuildForms(User $user, int $organizationId): bool
+    {
+        return self::hasAppAbility($user, $organizationId, 'form', AppAbility::Create);
+    }
+
+    public static function canManageForm(User $user, Form $form): bool
+    {
+        $abilities = self::appAbilitiesFor($user, $form->organization_id, 'form');
+
+        return in_array('edit', $abilities, true)
+            || ($form->created_by === $user->id && in_array('create', $abilities, true));
+    }
+
+    public static function canDeleteForm(User $user, Form $form): bool
+    {
+        $abilities = self::appAbilitiesFor($user, $form->organization_id, 'form');
+
+        return in_array('delete', $abilities, true)
+            || ($form->created_by === $user->id && in_array('create', $abilities, true));
+    }
+
+    /** Published, in the audience, and the role may use the Form app. */
+    public static function canFillForm(User $user, Form $form): bool
+    {
+        return $form->isOpen()
+            && self::hasAppAbility($user, $form->organization_id, 'form', AppAbility::View)
+            && self::inFormAudience($user, $form);
+    }
+
+    public static function canViewForm(User $user, Form $form): bool
+    {
+        return self::canManageForm($user, $form) || self::canFillForm($user, $form);
+    }
+
+    public static function inFormAudience(User $user, Form $form): bool
+    {
+        $roles = $form->audience['roles'] ?? [];
+        $departments = array_map('intval', $form->audience['department_ids'] ?? []);
+        if ($roles === [] && $departments === []) {
+            return true;
+        }
+        $role = self::role($user, $form->organization_id)?->value;
+        if ($role && in_array($role, $roles, true)) {
+            return true;
+        }
+
+        return $departments !== [] && DB::table('department_user')
+            ->where('organization_id', $form->organization_id)
+            ->where('user_id', $user->id)
+            ->whereIn('department_id', $departments)
+            ->exists();
+    }
+
+    /** Forms listed to a member: every form for form editors, otherwise their own plus those they can fill. */
+    public static function visibleFormsQuery(User $user, int $organizationId): Builder
+    {
+        $query = Form::query()->where('forms.organization_id', $organizationId);
+        $abilities = self::appAbilitiesFor($user, $organizationId, 'form');
+        if (! in_array('view', $abilities, true) || ! self::membership($user, $organizationId)) {
+            return $query->whereRaw('false');
+        }
+        if (in_array('edit', $abilities, true)) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $q) use ($user, $organizationId, $abilities) {
+            if (in_array('create', $abilities, true)) {
+                $q->where('forms.created_by', $user->id);
+            }
+            $q->orWhere(fn (Builder $open) => self::whereFillable($open, $user, $organizationId));
+        });
+    }
+
+    /** Published forms the member can fill (SQL twin of canFillForm). */
+    public static function fillableFormsQuery(User $user, int $organizationId): Builder
+    {
+        $query = Form::query()->where('forms.organization_id', $organizationId);
+        if (! self::membership($user, $organizationId) || ! self::hasAppAbility($user, $organizationId, 'form')) {
+            return $query->whereRaw('false');
+        }
+
+        return self::whereFillable($query, $user, $organizationId);
+    }
+
+    private static function whereFillable(Builder $query, User $user, int $organizationId): Builder
+    {
+        $role = self::role($user, $organizationId)?->value ?? '';
+
+        return $query->where('forms.status', Form::STATUS_PUBLISHED)
+            ->whereNotNull('forms.current_version_id')
+            ->where(fn (Builder $a) => $a
+                ->whereRaw("coalesce(jsonb_array_length(forms.audience->'roles'), 0) = 0 and coalesce(jsonb_array_length(forms.audience->'department_ids'), 0) = 0")
+                ->orWhereRaw("jsonb_exists(coalesce(forms.audience->'roles', '[]'::jsonb), ?)", [$role])
+                ->orWhereExists(fn ($sub) => $sub->selectRaw('1')->from('department_user')
+                    ->where('department_user.user_id', $user->id)
+                    ->where('department_user.organization_id', $organizationId)
+                    ->whereRaw("coalesce(forms.audience->'department_ids', '[]'::jsonb) @> to_jsonb(department_user.department_id)")));
+    }
+
+    public static function canViewSubmission(User $user, FormSubmission $submission): bool
+    {
+        if (! self::membership($user, $submission->organization_id)) {
+            return false;
+        }
+        if ($submission->submitter_id === $user->id) {
+            return true;
+        }
+        $form = $submission->relationLoaded('form') ? $submission->form : $submission->form()->first();
+        if ($form && self::canManageForm($user, $form)) {
+            return true;
+        }
+        if (self::hasAppAbility($user, $submission->organization_id, 'form', AppAbility::Admin)) {
+            return true;
+        }
+        // Approvers of the submission's approval request.
+        $request = $submission->approval_request_id ? ApprovalRequest::find($submission->approval_request_id) : null;
+
+        return $request !== null && self::canViewApprovalRequest($user, $request);
     }
 
     // ----------------------------------------------------------------- Reports

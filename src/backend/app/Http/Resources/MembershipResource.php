@@ -22,6 +22,7 @@ class MembershipResource extends JsonResource
                 'job_title' => $this->user->job_title,
                 'phone' => $this->user->phone,
             ]),
+            'manager' => $this->whenLoaded('manager', fn () => $this->manager ? new UserSummaryResource($this->manager) : null),
             'departments' => $this->when(isset($this->departments), fn () => DepartmentResource::collection($this->departments)),
         ];
     }

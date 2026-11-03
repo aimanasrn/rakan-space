@@ -1,19 +1,26 @@
-"use client"
+import type { Metadata } from "next"
+import { LandingPage } from "@/components/landing/landing-page"
 
-import { useRouter } from "next/navigation"
-import { useEffect } from "react"
-import { FullPageLoader } from "@/components/common"
-import { homeFor, useMe } from "@/hooks/use-auth"
+const description =
+  "One space. One team. Chat, projects, approvals, forms and every business app your company runs on, in one secure workspace. Free for teams of up to 10."
 
-/** Entry point: send people to their workspace, onboarding, or sign-in. */
+export const metadata: Metadata = {
+  // The root layout's template would append "· RakanSpace"; the landing page sets its own title.
+  title: { absolute: "RakanSpace · One space. One team." },
+  description,
+  openGraph: {
+    type: "website",
+    siteName: "RakanSpace",
+    title: "RakanSpace · One space. One team.",
+    description,
+  },
+  twitter: { card: "summary_large_image", title: "RakanSpace · One space. One team.", description },
+}
+
+/**
+ * Public landing page for everyone, rendered on the server. Signed-in people
+ * see "Open workspace" in the top bar. In-app redirects use /home.
+ */
 export default function Home() {
-  const router = useRouter()
-  const { data: me, isLoading } = useMe()
-
-  useEffect(() => {
-    if (isLoading) return
-    router.replace(me ? homeFor(me) : "/login")
-  }, [me, isLoading, router])
-
-  return <FullPageLoader />
+  return <LandingPage />
 }

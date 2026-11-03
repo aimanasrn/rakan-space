@@ -14,7 +14,7 @@ class OrganizationMembership extends Model
 
     public const STATUS_REMOVED = 'removed';
 
-    protected $fillable = ['organization_id', 'user_id', 'role', 'status', 'joined_at', 'status_changed_at'];
+    protected $fillable = ['organization_id', 'user_id', 'role', 'manager_id', 'status', 'joined_at', 'status_changed_at'];
 
     protected function casts(): array
     {
@@ -33,6 +33,12 @@ class OrganizationMembership extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** The user this member reports to (same organisation). */
+    public function manager(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'manager_id');
     }
 
     public function isActive(): bool

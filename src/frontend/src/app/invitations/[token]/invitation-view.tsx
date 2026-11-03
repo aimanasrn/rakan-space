@@ -131,7 +131,7 @@ export function InvitationView() {
           ) : null}
           {me && emailMatches === false ? null : me && (!inv || inv.status !== "pending") ? (
             <Button className="w-full" variant="ghost" asChild>
-              <Link href="/">Go to RakanSpace</Link>
+              <Link href="/home">Go to RakanSpace</Link>
             </Button>
           ) : null}
         </CardFooter>

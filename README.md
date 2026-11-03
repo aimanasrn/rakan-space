@@ -79,6 +79,14 @@ Things to try:
 - Open two browsers (e.g. Hafiz and Priya) on `#engineering` to see real-time messages,
   unread counts and notifications.
 - Invite someone from **Members → Invite people**, then open the email in Mailpit.
+- Sign in as **Priya** → **Approval**: Hafiz's keyboard purchase is waiting for her.
+  Approve it, then sign in as **Hafiz** to see it approved (and the email in Mailpit).
+- Sign in as **Tan Mei Ling** → **Form → My submissions**: her leave request was
+  returned for changes; edit and resubmit it. Her RM 8,200 workstation passed her
+  manager and now waits for Finance (**Daniel**), because the workflow adds a
+  Finance step above RM 5,000.
+- Sign in as **Daniel** → **Form → Manage forms** → *Purchase Request* to see the
+  builder (drag-and-drop fields, show/hide rules, preview, publish versions).
 
 ## Common commands
 
@@ -92,6 +100,8 @@ Things to try:
 | Frontend lint | `cd src/frontend && npm run lint` |
 | Frontend production build | `cd src/frontend && npm run build && npm run start` |
 | Run reminders now | `docker compose exec backend php artisan rakanspace:send-reminders` |
+| Sync the app catalogue | `docker compose exec backend php artisan rakanspace:sync-apps` |
+| Send approval reminders/escalations now | `docker compose exec backend php artisan rakanspace:approval-sla` |
 
 ## What is implemented
 
@@ -125,6 +135,24 @@ Things to try:
 - **Search and reports**: permission-aware search across messages, channels,
   projects, tasks and files; reports for status counts, completions, overdue
   tasks and project progress.
+- **App launcher**: grid button in the top bar opens a launcher with
+  admin-managed banners, installed apps (pin to the sidebar) and a marketplace
+  (install, or request access as a non-admin). Per-app abilities per role
+  (view/create/edit/delete/approve/admin), access requests with email + in-app
+  notifications, and Settings → Apps for installs, permissions, requests and banners.
+  Modules not built yet open a placeholder page.
+- **Reporting lines**: each membership can have a reporting manager (Members → Reports to).
+- **Approval**: workflow designer (sequential steps; approvers by person, role or
+  reporting manager; "any one" or "everyone" per step; conditional steps such as
+  amount > 5,000; time limits with reminders and escalation), inbox and
+  "my requests", approve / reject / return with comments, resubmit after return,
+  withdraw, out-of-office delegation, full history. Other modules call
+  `Approvals::submitForApproval()` and react to `ApprovalRequestStatusChanged`.
+- **Form**: drag-and-drop builder (text, long text, number, date, dropdown, single
+  choice, checkboxes, file upload, signature, table/repeater), required and
+  validation rules, show/hide logic, versions with publish/close, audience by
+  role and department, one or many responses, optional approval workflow,
+  "my submissions" with status, responses per form.
 - **UI**: collapsible sidebar, workspace switcher, Ctrl/⌘+K search,
   notifications menu, profile menu, light/dark themes, mobile navigation,
   loading/empty/error states, confirmations for destructive actions, keyboard
@@ -155,7 +183,9 @@ Details: [architecture](docs/architecture.md) · [permission matrix](docs/permis
   should add Postgres full-text indexes or a search engine.
 - No message threads view (replies are shown inline with a quote), reactions,
   typing indicators or presence.
-- Email notifications are not sent for in-app notifications (only auth and invitation emails).
+- Email copies of in-app notifications are opt-in per notification type; so far
+  only app access requests and their decisions send email. There are no per-user
+  email preferences yet.
 - Task deadline reminders are sent once, the day before the due date.
 - An already-open WebSocket subscription is not force-closed when access is revoked;
   it receives only IDs (no content), cannot fetch content, cannot re-subscribe, and
@@ -165,7 +195,7 @@ Details: [architecture](docs/architecture.md) · [permission matrix](docs/permis
 
 ## Future scope (not implemented)
 
-Attendance and check-in/out · Timesheets · Leave management · Expense claims ·
-Configurable approvals · Subscription billing · Guest access · Platform
+Attendance and check-in/out · Timesheets · Leave balances · Expense claims ·
+Subscription billing · Guest access · Platform
 administration portal · Native mobile apps · External calendar integrations
 (Google/Microsoft) and recurring events · Voice/video calling.

@@ -25,10 +25,10 @@ Browser ──HTTPS──▶ Next.js (App Router, client-rendered workspace)
 | Access rules | `app/Support/Permissions.php` |
 | Feature controllers | `app/Http/Controllers/*Controller.php` (one per module) |
 | API shapes | `app/Http/Resources` |
-| Domain helpers | `app/Support/ActivityLog.php`, `Notifier.php`, `Attachments.php` |
+| Domain helpers | `app/Support/ActivityLog.php`, `Notifier.php`, `Attachments.php`, `AppCatalog.php`, `AppInstaller.php`, `ReportingLine.php` |
 | Background work | `app/Jobs/DeliverNotifications.php`, `app/Console/Commands` |
 | Real-time events | `app/Events/ConversationMessageChanged.php`, `UserEvent.php` |
-| Schema | `database/migrations` (4 feature migrations) |
+| Schema | `database/migrations` (feature migrations, one or more per module) |
 | Demo data | `database/seeders/DemoSeeder.php` |
 
 ### Organisation isolation
@@ -72,6 +72,81 @@ and only broadcasts rows that were actually inserted. Reminders use keys such as
 overlapping scheduler runs never duplicate them. Jobs retry 3 times with backoff;
 failures are stored in `failed_jobs` and logged (without payloads).
 
+Pass `email: true` to also queue a `NotificationMail` (title, short body, link)
+to each recipient whose in-app row was newly inserted, so deduplication applies
+to email too. Used for app access requests and their decisions.
+
+### App launcher and modules
+
+- The app catalogue is defined in `App\Support\AppCatalog` and synced into the
+  `apps` table by the migration, `AppCatalogSeeder` and
+  `php artisan rakanspace:sync-apps` (also run by the Docker entrypoint).
+- `organization_apps` = what each organisation installed (new organisations get
+  the default apps); `user_app_pins` = per-user shortcuts;
+  `app_role_permissions` = per-organisation overrides of role abilities;
+  `app_access_requests` = members asking for marketplace apps;
+  `launcher_banners` = admin-managed carousel slides.
+- `GET /api/orgs/{slug}/launcher` returns `{ banners, installed, marketplace,
+  can_manage }`, filtered on the server. Each app's home page lives at
+  `/w/{slug}/apps/{key}` (Project points to the existing `/projects`).
+- `organization_memberships.manager_id` is the reporting line, constrained to
+  the same organisation. `App\Support\ReportingLine::managerOf()` returns the
+  active manager (for approval routing).
+- Module code lives in its own folders: `app/Models/{Approval,Form}`,
+  `app/Http/Controllers/{Approval,Form}`, `app/Support/{Approvals,Forms}`,
+  `src/components/apps/{approval,form}` and `src/app/w/[org]/apps/{approval,form}`.
+  Module routes can require their app with the `app:{key}` middleware (404 otherwise).
+
+### Approval engine (`App\Support\Approvals\Approvals`)
+
+Any module sends something for approval with:
+
+```php
+Approvals::submitForApproval($organization, $user, 'form_submission', $id, $workflow, $title, $data, $summary, $link);
+```
+
+- **Workflows** (`approval_workflows` + `approval_workflow_steps`) are templates.
+  On submit, the steps are copied into `approval_request_steps` for the current
+  *round*, so editing a workflow never changes requests in progress.
+- **Steps** run in order. Each step's approvers are a list of
+  `{type: user|role|manager}` resolved **when the step starts** (current
+  reporting lines and delegations). Mode `any` = one approval completes the step;
+  `all` = everyone must approve (parallel). A step with a `condition`
+  (`{field, operator, value}`, e.g. `amount gt 5000`) is skipped when it does not
+  match the request `data`. The requester is removed; an empty step goes to
+  Owners/Admins.
+- **Decisions**: approve / reject / return (reject and return need a comment).
+  Return lets the requester change and resubmit; that starts round 2 from the first step.
+- **SLA**: `rakanspace:approval-sla` (every 5 minutes) reminds waiting approvers
+  when a step passes `sla_hours` and adds the `escalate_to` user at twice the time.
+  Each is claimed with a conditional update, so overlapping runs never repeat it.
+- **Audit trail**: every event is an `approval_actions` row (submitted, step
+  started, decisions with comments, skipped, reminded, escalated, delegated, …).
+- **Events**: `ApprovalRequestStatusChanged` (IDs only) is dispatched synchronously
+  inside the transaction whenever a request is approved, rejected, returned,
+  cancelled or resubmitted. Modules listen to it (the Form module's
+  `SyncSubmissionWithApproval` updates the response status). Notifications go
+  through `Notifier` with dedupe keys and email copies.
+
+### Form module (`App\Support\Forms`)
+
+- A form has at most one **draft** version (`form_versions.published_at` is null)
+  that the builder replaces as a whole (`PUT /forms/{id}/draft`). Publishing
+  freezes it and makes it `current_version_id`; each response points at the
+  version it was filled against, so old answers always show with their own fields.
+- **Field types**: text, textarea, number, date, dropdown, radio, checkbox,
+  file, signature, table (repeater with text/number/date/dropdown columns).
+- **Show/hide rules**: one condition per field, which may only use a field above
+  it (no loops). The server (`SubmissionValidator`) and the client
+  (`src/lib/conditions.ts`) evaluate the same rules; hidden fields are never
+  required and their values are dropped. Rules are shared with approval step
+  conditions (`App\Support\Conditions`).
+- **Files and signatures** reuse private attachments: upload first, then the
+  response links them (only the submitter's own unattached uploads).
+  Signatures are PNG uploads (drawn or typed).
+- If the form has a workflow, each response is submitted with its non-file
+  answers as approval `data`, so step conditions can use field keys.
+
 ### Time
 
 - Event times are `timestamptz`, stored in UTC and returned as ISO-8601.
@@ -104,7 +179,7 @@ Progress = done tasks ÷ all tasks (0 % with no tasks).
 | Auth & onboarding pages | `src/app/(auth)`, `src/app/onboarding`, `src/app/invitations/[token]` |
 | Workspace shell | `src/app/w/[org]/layout.tsx` → `components/workspace/*` |
 | Page views | `components/views/*-view.tsx` (each route's `page.tsx` wraps one in `<Suspense>`) |
-| Feature components | `components/chat`, `components/tasks`, `components/projects` |
+| Feature components | `components/chat`, `components/tasks`, `components/projects`, `components/launcher` |
 | API client | `lib/api.ts` (cookies, XSRF, error normalisation) |
 | Real-time | `lib/echo.ts`, `lib/realtime.ts`, `components/workspace/realtime.tsx` |
 | Dates/time zones | `lib/datetime.ts` |

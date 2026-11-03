@@ -10,6 +10,7 @@ use App\Models\Conversation;
 use App\Models\Organization;
 use App\Models\OrganizationMembership;
 use App\Support\ActivityLog;
+use App\Support\AppCatalog;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -58,6 +59,7 @@ class OrganizationController extends Controller
             ]);
             $general->memberships()->create(['user_id' => $user->id, 'role' => 'admin', 'joined_at' => now()]);
 
+            AppCatalog::installDefaults($organization, $user);
             ActivityLog::audit($organization->id, $user, 'organization.created', $organization);
 
             return $organization;
@@ -195,6 +197,7 @@ class OrganizationController extends Controller
                 'publish_announcements' => $role->atLeast(Role::Manager),
                 'create_org_events' => $role->atLeast(Role::Manager),
                 'view_reports' => $role->atLeast(Role::Manager),
+                'manage_apps' => $role->isAdministrator(),
             ],
         ];
     }

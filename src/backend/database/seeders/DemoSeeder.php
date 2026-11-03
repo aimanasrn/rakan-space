@@ -3,13 +3,17 @@
 namespace Database\Seeders;
 
 use App\Enums\Role;
+use App\Models\AppAccessRequest;
 use App\Models\Conversation;
+use App\Models\LauncherApp;
 use App\Models\Organization;
 use App\Models\OrganizationMembership;
 use App\Models\Project;
 use App\Models\User;
+use App\Models\UserAppPin;
 use App\Models\UserNotification;
 use App\Support\ActivityLog;
+use App\Support\AppCatalog;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -154,6 +158,24 @@ class DemoSeeder extends Seeder
         $this->notify($org, $u['hafiz'], 'task.assigned', 'Priya Nair assigned you "Implement login with SSO"', '/projects/'.$mobile->id, $u['priya']);
         $this->notify($org, $u['hafiz'], 'mention', 'Priya Nair mentioned you in #engineering', '/chat/'.$engineering->id, $u['priya']);
         $this->notify($org, $u['meiling'], 'announcement', 'New announcement: Welcome to RakanSpace', '/announcements', $u['aisyah']);
+
+        // Reporting lines
+        $this->reportsTo($org, ['daniel' => 'aisyah', 'priya' => 'aisyah', 'hafiz' => 'priya', 'meiling' => 'priya']);
+
+        // App launcher
+        $this->launcher($org, $u['aisyah'], [
+            'hafiz' => ['project', 'timesheet'],
+            'priya' => ['project', 'approval', 'timesheet'],
+            'aisyah' => ['approval', 'opportunity'],
+        ]);
+        $checkin = LauncherApp::where('key', 'checkin')->first();
+        AppAccessRequest::create([
+            'organization_id' => $org->id, 'app_id' => $checkin->id, 'user_id' => $u['hafiz']->id,
+            'note' => 'For client-site visits with the Mobile App Beta pilot users.',
+        ]);
+
+        // Forms and approvals (needs the reporting lines above).
+        (new FormApprovalDemoSeeder)->rakanTech($org, $this->users);
     }
 
     private function seedKopiKita(): void
@@ -190,9 +212,50 @@ class DemoSeeder extends Seeder
             'body' => 'Please make sure every outlet has the new menu boards up by Sunday night.',
             'audience' => 'organization', 'requires_acknowledgement' => true, 'pinned_at' => now(),
         ]);
+
+        $this->reportsTo($org, ['zul' => 'farah', 'siti' => 'zul', 'daniel' => 'zul']);
+        $this->launcher($org, $u['farah'], ['siti' => ['timesheet', 'lms'], 'zul' => ['project', 'approval']]);
+        (new FormApprovalDemoSeeder)->kopiKita($org, $u);
     }
 
     // ----------------------------------------------------------------- helpers
+
+    /** @param array<string, string> $lines person key => manager key */
+    private function reportsTo(Organization $org, array $lines): void
+    {
+        foreach ($lines as $person => $manager) {
+            OrganizationMembership::where('organization_id', $org->id)->where('user_id', $this->users[$person]->id)
+                ->update(['manager_id' => $this->users[$manager]->id]);
+        }
+    }
+
+    /**
+     * Default apps, one banner and some pins.
+     *
+     * @param  array<string, list<string>>  $pins  person key => app keys
+     */
+    private function launcher(Organization $org, User $owner, array $pins): void
+    {
+        AppCatalog::installDefaults($org, $owner);
+
+        $org->banners()->create([
+            'title' => 'Center of Excellence',
+            'description' => 'Aims to develop and train talents to continue the legacy and sustain the ecosystem of mainframe technology',
+            'cta_label' => 'Learn more',
+            'cta_url' => '/apps/lms',
+            'illustration' => 'excellence',
+            'is_active' => true,
+            'sort_order' => 0,
+            'created_by' => $owner->id,
+        ]);
+
+        $apps = LauncherApp::pluck('id', 'key');
+        foreach ($pins as $person => $keys) {
+            foreach ($keys as $key) {
+                UserAppPin::create(['organization_id' => $org->id, 'user_id' => $this->users[$person]->id, 'app_id' => $apps[$key]]);
+            }
+        }
+    }
 
     private function organization(string $name, string $slug, User $owner, array $attrs): Organization
     {

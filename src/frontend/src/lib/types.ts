@@ -46,6 +46,7 @@ export interface OrgPermissions {
   publish_announcements: boolean
   create_org_events: boolean
   view_reports: boolean
+  manage_apps: boolean
 }
 
 export interface Organization extends Omit<OrganizationSummary, "role"> {
@@ -69,6 +70,7 @@ export interface Membership {
   status: "active" | "deactivated" | "removed"
   joined_at: string | null
   user: UserSummary & { email: string; phone: string | null }
+  manager?: UserSummary | null
   departments?: Department[]
 }
 
@@ -261,4 +263,254 @@ export interface Paginated<T> {
   data: T[]
   meta: { current_page: number; last_page: number; total: number; per_page?: number; [key: string]: unknown }
   links?: unknown
+}
+
+// ------------------------------------------------------------- App launcher
+
+export type AppAbility = "view" | "create" | "edit" | "delete" | "approve" | "admin"
+export type ConfigurableRole = "manager" | "staff"
+
+export interface LauncherAppBase {
+  id: number
+  key: string
+  name: string
+  tagline: string
+  description: string
+  icon: string
+  gradient: [string, string]
+  category: string
+  /** Workspace-relative path, e.g. "/apps/form". */
+  path: string
+}
+
+export interface InstalledApp extends LauncherAppBase {
+  pinned: boolean
+  abilities: AppAbility[]
+}
+
+export interface MarketplaceApp extends LauncherAppBase {
+  request_pending: boolean
+}
+
+export interface LauncherBanner {
+  id: number
+  title: string
+  description: string | null
+  cta_label: string | null
+  cta_url: string | null
+  image_url: string | null
+  illustration: string | null
+  is_active: boolean
+  is_live: boolean
+  sort_order: number
+  starts_at: string | null
+  ends_at: string | null
+  updated_at: string | null
+}
+
+export interface LauncherData {
+  banners: LauncherBanner[]
+  installed: InstalledApp[]
+  marketplace: MarketplaceApp[]
+  can_manage: boolean
+}
+
+export interface AdminApp extends LauncherAppBase {
+  installed: boolean
+  installed_at: string | null
+  role_abilities: Record<ConfigurableRole, AppAbility[]>
+  pending_requests: number
+}
+
+export interface AppAccessRequest {
+  id: number
+  status: "pending" | "approved" | "rejected"
+  note: string | null
+  app: LauncherAppBase
+  user: UserSummary
+  decided_by: UserSummary | null
+  decided_at: string | null
+  created_at: string
+}
+
+// ----------------------------------------------------------------- Approval
+
+export type ConditionOperator = "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "contains" | "filled" | "empty"
+
+export interface Condition {
+  field: string
+  operator: ConditionOperator
+  value?: string | number | null
+}
+
+export type ApproverDefinition =
+  | { type: "user"; user_id: number; user?: UserSummary | null }
+  | { type: "role"; role: Role }
+  | { type: "manager" }
+
+export interface WorkflowStep {
+  id?: number
+  position?: number
+  name: string
+  mode: "any" | "all"
+  approvers: ApproverDefinition[]
+  condition: Condition | null
+  sla_hours: number | null
+  escalate_to: UserSummary | null
+}
+
+export interface ApprovalWorkflow {
+  id: number
+  name: string
+  description: string | null
+  is_active: boolean
+  steps_count?: number
+  requests_count?: number
+  steps?: WorkflowStep[]
+  created_by?: UserSummary | null
+  updated_at: string
+}
+
+export type ApprovalStatus = "pending" | "approved" | "rejected" | "returned" | "cancelled"
+
+export interface ApprovalRequestSummary {
+  id: number
+  title: string
+  summary: string | null
+  status: ApprovalStatus
+  entity_type: string
+  entity_id: number | null
+  link: string | null
+  round: number
+  requester: UserSummary
+  workflow: { id: number; name: string } | null
+  current_step: { id: number; name: string; position: number; due_at: string | null; overdue: boolean; waiting_on: string[] } | null
+  my_turn: boolean
+  submitted_at: string
+  completed_at: string | null
+}
+
+export interface ApprovalStepDetail {
+  id: number
+  position: number
+  name: string
+  mode: "any" | "all"
+  status: "waiting" | "pending" | "approved" | "rejected" | "returned" | "skipped" | "cancelled"
+  condition: Condition | null
+  activated_at: string | null
+  completed_at: string | null
+  due_at: string | null
+  approvers: {
+    user: UserSummary | null
+    source: string
+    delegated_from: UserSummary | null
+    decision: "approved" | "rejected" | "returned" | null
+    comment: string | null
+    decided_at: string | null
+  }[]
+}
+
+export interface ApprovalRequestDetail extends ApprovalRequestSummary {
+  data: Record<string, unknown>
+  rounds: { round: number; steps: ApprovalStepDetail[] }[]
+  history: {
+    id: number
+    action: string
+    actor: UserSummary | null
+    comment: string | null
+    step: string | null
+    properties: Record<string, unknown> | null
+    created_at: string
+  }[]
+  permissions: { decide: boolean; resubmit: boolean; cancel: boolean }
+}
+
+export interface ApprovalSummary {
+  inbox: number
+  my_pending: number
+  my_returned: number
+  overdue: number
+  can_create: boolean
+  can_manage: boolean
+}
+
+export interface ApprovalDelegation {
+  id: number
+  delegator: UserSummary
+  delegate: UserSummary
+  starts_at: string
+  ends_at: string
+  reason: string | null
+  status: "active" | "scheduled" | "ended" | "revoked"
+  can_revoke: boolean
+}
+
+// --------------------------------------------------------------------- Form
+
+export type FieldType = "text" | "textarea" | "number" | "date" | "dropdown" | "radio" | "checkbox" | "file" | "signature" | "table"
+export type TableColumnType = "text" | "number" | "date" | "dropdown"
+
+export interface TableColumn {
+  key?: string
+  label: string
+  type: TableColumnType
+  choices?: string[]
+}
+
+export interface FormFieldDef {
+  key: string
+  type: FieldType
+  label: string
+  help_text: string | null
+  required: boolean
+  options: { choices?: string[]; columns?: TableColumn[] } | null
+  validation: { min?: number; max?: number; min_length?: number; max_length?: number; max_files?: number; max_rows?: number } | null
+  visibility: Condition | null
+}
+
+export type FormStatus = "draft" | "published" | "closed"
+
+export interface FormSummary {
+  id: number
+  name: string
+  description: string | null
+  status: FormStatus
+  audience: { roles: Role[]; department_ids: number[] }
+  workflow: { id: number; name: string } | null
+  allow_multiple: boolean
+  version: number | null
+  has_unpublished_changes?: boolean
+  submissions_count?: number
+  my_submissions_count?: number
+  created_by: UserSummary | null
+  published_at: string | null
+  updated_at: string
+  permissions: { manage: boolean; delete: boolean; fill: boolean }
+}
+
+export interface FormDetail extends FormSummary {
+  fields: FormFieldDef[]
+  draft_fields: FormFieldDef[] | null
+}
+
+export type SubmissionStatus = "submitted" | "pending_approval" | "approved" | "rejected" | "returned" | "withdrawn"
+
+export interface FormSubmissionSummary {
+  id: number
+  reference: string
+  status: SubmissionStatus
+  form: { id: number; name: string }
+  version: number
+  submitter: UserSummary
+  approval_request_id: number | null
+  submitted_at: string
+  updated_at: string
+  permissions: { resubmit: boolean; withdraw: boolean }
+}
+
+export interface FormSubmissionDetail extends FormSubmissionSummary {
+  fields: FormFieldDef[]
+  values: Record<string, unknown>
+  attachments: Attachment[]
+  approval: { id: number; status: ApprovalStatus; current_step: string | null; can_view: boolean } | null
 }

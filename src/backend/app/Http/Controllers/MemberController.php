@@ -10,11 +10,14 @@ use App\Models\OrganizationMembership;
 use App\Models\Task;
 use App\Models\User;
 use App\Support\ActivityLog;
+use App\Support\Approvals\Approvals;
+use App\Support\ReportingLine;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class MemberController extends Controller
 {
@@ -32,7 +35,7 @@ class MemberController extends Controller
         // Only administrators can list deactivated members.
         $status = $viewer->isAdministrator() ? ($request->input('status') ?: 'active') : 'active';
 
-        $query = $organization->memberships()->with('user')
+        $query = $organization->memberships()->with(['user', 'manager'])
             ->join('users', 'users.id', '=', 'organization_memberships.user_id')
             ->select('organization_memberships.*')
             ->when($status === 'all', fn ($q) => $q->whereIn('status', [OrganizationMembership::STATUS_ACTIVE, OrganizationMembership::STATUS_DEACTIVATED]))
@@ -93,6 +96,38 @@ class MemberController extends Controller
         return response()->json(['data' => new MembershipResource($membership->fresh('user'))]);
     }
 
+    /** Sets or clears who the member reports to. Owners and Admins only. */
+    public function updateManager(Request $request, Organization $organization, OrganizationMembership $membership): JsonResponse
+    {
+        $actor = $request->attributes->get('membership');
+        abort_unless($actor->isAdministrator(), 403, 'Only owners and admins can set reporting managers.');
+        abort_if($membership->status === OrganizationMembership::STATUS_REMOVED, 422, 'This member has been removed.');
+
+        $data = $request->validate(['manager_id' => ['present', 'nullable', 'integer']]);
+        $managerId = $data['manager_id'] !== null ? (int) $data['manager_id'] : null;
+
+        if ($managerId !== null) {
+            if ($managerId === $membership->user_id) {
+                throw ValidationException::withMessages(['manager_id' => 'A member cannot report to themselves.']);
+            }
+            // Only active members of this organisation can be managers.
+            if ($organization->filterActiveMemberIds([$managerId]) === []) {
+                throw ValidationException::withMessages(['manager_id' => 'Choose an active member of this workspace.']);
+            }
+            if (ReportingLine::wouldCreateCycle($organization->id, $membership->user_id, $managerId)) {
+                throw ValidationException::withMessages(['manager_id' => 'This would create a reporting loop.']);
+            }
+        }
+
+        $old = $membership->manager_id;
+        $membership->update(['manager_id' => $managerId]);
+        ActivityLog::audit($organization->id, $request->user(), 'member.manager_changed', $membership, [
+            'user_id' => $membership->user_id, 'from' => $old, 'to' => $managerId,
+        ]);
+
+        return response()->json(['data' => new MembershipResource($membership->fresh(['user', 'manager']))]);
+    }
+
     public function deactivate(Request $request, Organization $organization, OrganizationMembership $membership): JsonResponse
     {
         $actor = $request->attributes->get('membership');
@@ -145,8 +180,9 @@ class MemberController extends Controller
                 $this->ensureAnotherOwner($organization, $membership);
             }
 
-            self::revokeResourceAccess($organization, $membership->user_id);
+            // Mark removed first so approval reassignment never picks this member again.
             $membership->update(['status' => OrganizationMembership::STATUS_REMOVED, 'status_changed_at' => now()]);
+            self::revokeResourceAccess($organization, $membership->user_id);
 
             ActivityLog::audit($organization->id, $request->user(), $leaving ? 'member.left' : 'member.removed', $membership, [
                 'user_id' => $membership->user_id,
@@ -172,6 +208,17 @@ class MemberController extends Controller
             ->where('user_id', $userId)
             ->whereIn('event_id', fn ($q) => $q->select('id')->from('events')->where('organization_id', $organization->id)->where('starts_at', '>', now()))
             ->delete();
+
+        // App shortcuts and open app requests in this organisation only.
+        DB::table('user_app_pins')->where('organization_id', $organization->id)->where('user_id', $userId)->delete();
+        DB::table('app_access_requests')->where('organization_id', $organization->id)->where('user_id', $userId)->where('status', 'pending')->delete();
+        // Approvals: end their delegations here and hand their open approval tasks on.
+        DB::table('approval_delegations')->where('organization_id', $organization->id)
+            ->where(fn ($q) => $q->where('delegator_id', $userId)->orWhere('delegate_id', $userId))
+            ->whereNull('revoked_at')->where('ends_at', '>', now())->update(['revoked_at' => now()]);
+        Approvals::removeMember($organization->id, $userId);
+        // People who reported to this user no longer have a manager here.
+        OrganizationMembership::where('organization_id', $organization->id)->where('manager_id', $userId)->update(['manager_id' => null]);
 
         // Open work returns to the unassigned pool; completed tasks keep their history.
         Task::where('organization_id', $organization->id)

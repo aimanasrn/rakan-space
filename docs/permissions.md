@@ -24,6 +24,10 @@ controls; it never decides access.
 | Transfer ownership | ✓ | – | – | – |
 | Manage departments and department members | ✓ | ✓ | – | – |
 | View audit log | ✓ | ✓ | – | – |
+| Set a member's reporting manager | ✓ | ✓ | – | – |
+| Install / uninstall apps, set app permissions, decide access requests | ✓ | ✓ | – | – |
+| Manage launcher banners | ✓ | ✓ | – | – |
+| Request access to a marketplace app | – (install directly) | – (install directly) | ✓ | ✓ |
 | Create projects | ✓ | ✓ | ✓ | – |
 | View **all** projects (incl. restricted), manage any project | ✓ | ✓ | – | – |
 | Delete projects (others can archive) | ✓ | ✓ | – | – |
@@ -68,6 +72,68 @@ do **not** include private conversations.
 
 Archived projects are read-only for everyone.
 
+## Apps (launcher)
+
+Apps are installed per organisation. Inside an installed app, each member has
+abilities from this list: **view, create, edit, delete, approve, admin**. Every
+ability implies *view*; a role with no abilities does not see the app at all
+(the launcher hides it and `GET /apps/{key}` returns 404).
+
+| Role | Default abilities | Configurable |
+|---|---|:-:|
+| Owner, Admin | all | – (always all) |
+| Manager | view, create, edit, approve (Form: view, create, approve) | ✓ per app |
+| Staff | view, create (Form: view) | ✓ per app |
+
+Rules (`Permissions::appAbilitiesMap()`, `canUseApp()`, `canManageApps()`):
+
+- App abilities cover only the app's own data. They never open private
+  channels, direct messages or private events.
+- Pins are per user and only possible for apps the user can open.
+- Banners are visible to members while active and inside their start/end
+  window; Owners/Admins also see inactive ones. Banner images follow the same rule.
+- Uninstalling removes the app and everyone's pins; role settings are kept for
+  a reinstall. Removing a member deletes their pins and pending requests in
+  that workspace only, and clears them as reporting manager of others there.
+
+### Form
+
+All `/forms` and `/form-submissions` endpoints require the Form app to be
+installed and the role to have **view** (otherwise 404).
+
+| Ability | Meaning |
+|---|---|
+| view | Fill in published forms you are in the audience for; see your own responses |
+| create | Build forms; manage (edit, publish, close, see responses of) forms **you created** |
+| edit | Manage **every** form |
+| delete | Delete any form (only forms without responses can be deleted) |
+| admin | See every response in the workspace |
+
+- **Audience**: roles and/or departments; empty = everyone. Members outside the
+  audience get 404 for the form, even with the ID.
+- **A response is visible to**: the person who submitted it, people who manage
+  its form, Form admins, and participants of its approval request. Its files
+  follow the same rule (they do not appear in the Files page or search).
+- Uploaded files must be the submitter's own, not yet attached uploads.
+
+### Approval
+
+| Who | Can |
+|---|---|
+| Requester | See the request, withdraw it, resubmit it when returned |
+| Approver on any step (incl. the person who delegated, escalation and admin-cover approvers) | See the request; decide only while it is their turn |
+| Approval **admin** ability (Owners/Admins by default) | Design workflows, see every request (**All requests**) |
+| Approval **create** ability | Make requests directly in the Approval app |
+| Anyone else | 404 |
+
+- Being an approver does not need the Approval app; a request never gets stuck
+  because a role lost the app.
+- The requester is never an approver of their own request. If a step resolves to
+  nobody, Owners/Admins approve instead ("admin cover"), so nothing is approved
+  automatically. Reject and return need a comment.
+- Delegations are created by the delegator for themselves only. The delegate must
+  be an active member of the same workspace.
+
 ## Real-time channels
 
 | Channel | Authorised when |
@@ -89,6 +155,9 @@ Removing a member (status `removed`):
 - deletes their channel, project and department memberships **in that workspace only**;
 - removes them from future events in that workspace;
 - unassigns their open tasks (completed tasks keep the assignee for history);
+- ends their approval delegations there and hands their waiting approvals on
+  (to the other approvers on the step, or to Owners/Admins); their decisions,
+  requests and form responses are kept;
 - keeps their messages, comments, files and activity history;
 - does not touch their memberships in other workspaces;
 - writes an audit event.

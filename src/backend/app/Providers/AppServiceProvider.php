@@ -2,11 +2,19 @@
 
 namespace App\Providers;
 
+use App\Events\ApprovalRequestStatusChanged;
 use App\Models\Announcement;
+use App\Models\AppAccessRequest;
+use App\Models\Approval\ApprovalRequest;
+use App\Models\Approval\ApprovalWorkflow;
 use App\Models\Conversation;
 use App\Models\Department;
 use App\Models\Event;
+use App\Models\Form\Form;
+use App\Models\Form\FormSubmission;
 use App\Models\Invitation;
+use App\Models\LauncherApp;
+use App\Models\LauncherBanner;
 use App\Models\Message;
 use App\Models\Organization;
 use App\Models\OrganizationMembership;
@@ -14,6 +22,7 @@ use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskComment;
 use App\Models\User;
+use App\Support\Forms\SyncSubmissionWithApproval;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -51,7 +60,17 @@ class AppServiceProvider extends ServiceProvider
             'message' => Message::class,
             'event' => Event::class,
             'announcement' => Announcement::class,
+            'app' => LauncherApp::class,
+            'launcher_banner' => LauncherBanner::class,
+            'app_access_request' => AppAccessRequest::class,
+            'approval_workflow' => ApprovalWorkflow::class,
+            'approval_request' => ApprovalRequest::class,
+            'form' => Form::class,
+            'form_submission' => FormSubmission::class,
         ]);
+
+        // Modules react to approval outcomes (synchronously, inside the same transaction).
+        EventFacade::listen(ApprovalRequestStatusChanged::class, [SyncSubmissionWithApproval::class, 'handle']);
 
         // Workspaces are addressed by slug in URLs.
         Route::bind('organization', fn (string $value) => Organization::where('slug', $value)->firstOrFail());

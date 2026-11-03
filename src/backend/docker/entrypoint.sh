@@ -16,6 +16,7 @@ if ! grep -q '^APP_KEY=base64:' .env; then
 fi
 
 php artisan migrate --force
+php artisan rakanspace:sync-apps
 
 # Seed demo data once (set SEED_DEMO=false to skip).
 if [ "${SEED_DEMO:-true}" = "true" ] && [ ! -f storage/app/.demo-seeded ]; then

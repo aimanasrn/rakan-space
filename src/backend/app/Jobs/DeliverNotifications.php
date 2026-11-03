@@ -3,11 +3,15 @@
 namespace App\Jobs;
 
 use App\Events\UserEvent;
+use App\Mail\NotificationMail;
+use App\Models\Organization;
 use App\Models\OrganizationMembership;
+use App\Models\User;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -34,6 +38,7 @@ class DeliverNotifications implements ShouldQueue
         public ?int $actorId,
         public ?string $dedupeKey,
         public array $data = [],
+        public bool $email = false,
     ) {
         $this->onQueue('notifications');
     }
@@ -64,12 +69,31 @@ class DeliverNotifications implements ShouldQueue
             ]);
 
             if ($inserted > 0) {
+                if ($this->email) {
+                    $this->sendEmail((int) $userId);
+                }
                 UserEvent::dispatch((int) $userId, 'notification.created', [
                     'organization_id' => $this->organizationId,
                     'notification_id' => $id,
                 ]);
             }
         }
+    }
+
+    /** Queues an email copy. Only the title, short body and link are included. */
+    private function sendEmail(int $userId): void
+    {
+        $user = User::find($userId);
+        $organization = Organization::find($this->organizationId);
+        if (! $user || ! $organization) {
+            return;
+        }
+
+        $url = $this->link !== null
+            ? config('rakanspace.frontend_url').'/w/'.$organization->slug.$this->link
+            : null;
+
+        Mail::to($user)->queue(new NotificationMail($organization->name, $this->title, $this->body !== null ? Str::limit($this->body, 495) : null, $url));
     }
 
     public function failed(Throwable $e): void

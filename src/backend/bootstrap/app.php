@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\RequireApp;
 use App\Http\Middleware\ResolveOrganization;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Application;
@@ -23,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
         $middleware->alias([
             'org' => ResolveOrganization::class,
+            'app' => RequireApp::class,
         ]);
         // Never redirect API clients to a login page.
         $middleware->redirectGuestsTo(fn () => null);

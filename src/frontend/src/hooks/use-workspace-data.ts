@@ -17,6 +17,11 @@ export const keys = {
   project: (slug: string, id: number) => ["project", slug, id] as const,
   tasks: (slug: string, params?: object) => ["tasks", slug, params ?? {}] as const,
   task: (slug: string, id: number) => ["task", slug, id] as const,
+  launcher: (slug: string) => ["launcher", slug] as const,
+  adminApps: (slug: string) => ["admin-apps", slug] as const,
+  appRequests: (slug: string, params?: object) => ["app-requests", slug, params ?? {}] as const,
+  banners: (slug: string, params?: object) => ["launcher-banners", slug, params ?? {}] as const,
+  app: (slug: string, key: string) => ["app", slug, key] as const,
 }
 
 export function useConversations(slug: string) {

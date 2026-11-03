@@ -1,7 +1,8 @@
 "use client"
 
 import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { Crown, LogOut, ShieldCheck } from "lucide-react"
+import { Crown, LayoutGrid, LogOut, ShieldCheck } from "lucide-react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { toast } from "sonner"
@@ -28,10 +29,30 @@ export function SettingsView() {
     <div className="mx-auto max-w-3xl space-y-6 p-4 md:p-8">
       <PageHeader title="Settings" description={`Workspace settings for ${org.name}.`} />
       {org.permissions.manage_settings ? <OrganizationProfile /> : <ReadOnlyProfile />}
+      {org.permissions.manage_apps ? <AppsLink /> : null}
       {org.permissions.transfer_ownership ? <TransferOwnership /> : null}
       {org.permissions.view_audit_log ? <AuditLog /> : null}
       <LeaveWorkspace />
     </div>
+  )
+}
+
+function AppsLink() {
+  const { href } = useWorkspace()
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <LayoutGrid className="size-4" aria-hidden /> Apps & launcher
+        </CardTitle>
+        <CardDescription>Install apps, set what each role can do in them, review access requests and manage launcher banners.</CardDescription>
+      </CardHeader>
+      <CardFooter className="justify-end border-t">
+        <Button asChild variant="outline">
+          <Link href={href("/settings/apps")}>Manage apps</Link>
+        </Button>
+      </CardFooter>
+    </Card>
   )
 }
 
@@ -241,6 +262,22 @@ function AuditLog() {
         return "Transferred ownership"
       case "organization.updated":
         return "Updated organisation settings"
+      case "member.manager_changed":
+        return p.to ? "Changed a member's reporting manager" : "Cleared a member's reporting manager"
+      case "app.installed":
+        return `Installed the ${p.app} app`
+      case "app.uninstalled":
+        return `Uninstalled the ${p.app} app`
+      case "app.permissions_changed":
+        return `Changed permissions for the ${p.app} app`
+      case "app.request_rejected":
+        return `Declined a request for the ${p.app} app`
+      case "banner.created":
+        return `Created the launcher banner "${p.title}"`
+      case "banner.updated":
+        return "Updated a launcher banner"
+      case "banner.deleted":
+        return `Deleted the launcher banner "${p.title}"`
       default:
         return a.event.replaceAll(".", " ").replaceAll("_", " ")
     }
@@ -312,7 +349,7 @@ function LeaveWorkspace() {
               await api(orgPath(slug, `/members/${org.membership.id}`), { method: "DELETE" })
               toast.success(`You left ${org.name}.`)
               await qc.invalidateQueries({ queryKey: meKey })
-              router.replace("/")
+              router.replace("/home")
             } catch (e) {
               toast.error(errorMessage(e))
             }

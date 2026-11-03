@@ -13,6 +13,7 @@ import { homeFor, useMe } from "@/hooks/use-auth"
 import { keys } from "@/hooks/use-workspace-data"
 import { api, ApiError } from "@/lib/api"
 import type { Organization } from "@/lib/types"
+import { AppLauncher } from "@/components/launcher/app-launcher"
 import { AppSidebar } from "./app-sidebar"
 import { GlobalSearch } from "./global-search"
 import { NotificationsMenu } from "./notifications-menu"
@@ -84,6 +85,7 @@ export function WorkspaceShell({ children }: { children: React.ReactNode }) {
             <div className="min-w-0 flex-1">
               <GlobalSearch />
             </div>
+            <AppLauncher />
             <NotificationsMenu />
             <UserMenu />
           </header>

@@ -72,7 +72,7 @@ export function WorkspaceRealtime() {
       }
       toast.error(`Your access to ${org.name} has been removed.`)
       qc.invalidateQueries({ queryKey: meKey })
-      router.replace("/")
+      router.replace("/home")
     })
 
     return () => {

@@ -12,13 +12,17 @@ import {
   ListChecks,
   Megaphone,
   MessagesSquare,
+  Pin,
   Plus,
   Settings,
   Users,
 } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { Fragment } from "react"
 import { BrandMark } from "@/components/common"
+import { appIconComponent } from "@/components/launcher/app-icon"
+import { useLauncher } from "@/components/launcher/use-launcher"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,6 +48,7 @@ import {
 } from "@/components/ui/sidebar"
 import { useConversations } from "@/hooks/use-workspace-data"
 import { t, type TranslationKey } from "@/lib/i18n"
+import type { InstalledApp } from "@/lib/types"
 import { useWorkspace } from "./workspace-context"
 
 interface NavItem {
@@ -60,6 +65,10 @@ export function AppSidebar() {
   const { setOpenMobile } = useSidebar()
   const { data: conversations } = useConversations(slug)
   const unreadChat = (conversations ?? []).reduce((sum, c) => sum + (c.is_member ? c.unread_count : 0), 0)
+  const { data: launcher } = useLauncher(slug)
+  const apps = launcher?.installed ?? []
+  // The Project app opens /projects, so don't list it twice.
+  const projectsInApps = apps.some((a) => a.path === "/projects")
 
   const groups: { label: TranslationKey; items: NavItem[] }[] = [
     {
@@ -67,7 +76,7 @@ export function AppSidebar() {
       items: [
         { key: "nav.overview", path: "", icon: LayoutDashboard },
         { key: "nav.chat", path: "/chat", icon: MessagesSquare, badge: unreadChat },
-        { key: "nav.projects", path: "/projects", icon: FolderKanban },
+        { key: "nav.projects", path: "/projects", icon: FolderKanban, show: !projectsInApps },
         { key: "nav.myTasks", path: "/tasks", icon: ListChecks },
         { key: "nav.calendar", path: "/calendar", icon: CalendarDays },
       ],
@@ -138,31 +147,35 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        {groups.map((group) => (
-          <SidebarGroup key={group.label}>
-            <SidebarGroupLabel>{t(group.label)}</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {group.items
-                  .filter((i) => i.show !== false)
-                  .map((item) => (
-                    <SidebarMenuItem key={item.key}>
-                      <SidebarMenuButton asChild isActive={isActive(item.path)} tooltip={t(item.key)}>
-                        <Link href={href(item.path)} onClick={() => setOpenMobile(false)} aria-current={isActive(item.path) ? "page" : undefined}>
-                          <item.icon aria-hidden />
-                          <span>{t(item.key)}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                      {item.badge ? (
-                        <SidebarMenuBadge className="rounded-full bg-primary text-primary-foreground" aria-label={`${item.badge} unread`}>
-                          {item.badge > 99 ? "99+" : item.badge}
-                        </SidebarMenuBadge>
-                      ) : null}
-                    </SidebarMenuItem>
-                  ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+        {groups.map((group, index) => (
+          <Fragment key={group.label}>
+            {/* Apps sit between the Workspace and Collaborate groups. */}
+            {index === 1 ? <AppsGroup apps={apps} isActive={isActive} onNavigate={() => setOpenMobile(false)} /> : null}
+            <SidebarGroup>
+              <SidebarGroupLabel>{t(group.label)}</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {group.items
+                    .filter((i) => i.show !== false)
+                    .map((item) => (
+                      <SidebarMenuItem key={item.key}>
+                        <SidebarMenuButton asChild isActive={isActive(item.path)} tooltip={t(item.key)}>
+                          <Link href={href(item.path)} onClick={() => setOpenMobile(false)} aria-current={isActive(item.path) ? "page" : undefined}>
+                            <item.icon aria-hidden />
+                            <span>{t(item.key)}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                        {item.badge ? (
+                          <SidebarMenuBadge className="rounded-full bg-primary text-primary-foreground" aria-label={`${item.badge} unread`}>
+                            {item.badge > 99 ? "99+" : item.badge}
+                          </SidebarMenuBadge>
+                        ) : null}
+                      </SidebarMenuItem>
+                    ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </Fragment>
         ))}
       </SidebarContent>
       <SidebarFooter>
@@ -170,5 +183,40 @@ export function AppSidebar() {
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
+  )
+}
+
+/** Every app the user can open (from the launcher), pinned apps first. */
+function AppsGroup({ apps, isActive, onNavigate }: { apps: InstalledApp[]; isActive: (path: string) => boolean; onNavigate: () => void }) {
+  const { href } = useWorkspace()
+  if (!apps.length) return null
+  const sorted = [...apps.filter((a) => a.pinned), ...apps.filter((a) => !a.pinned)]
+
+  return (
+    <SidebarGroup>
+      <SidebarGroupLabel>{t("nav.apps")}</SidebarGroupLabel>
+      <SidebarGroupContent>
+        <SidebarMenu>
+          {sorted.map((app) => {
+            const Icon = appIconComponent(app.icon)
+            return (
+              <SidebarMenuItem key={app.key}>
+                <SidebarMenuButton asChild isActive={isActive(app.path)} tooltip={app.name}>
+                  <Link href={href(app.path)} onClick={onNavigate} aria-current={isActive(app.path) ? "page" : undefined}>
+                    <Icon aria-hidden />
+                    <span>{app.name}</span>
+                  </Link>
+                </SidebarMenuButton>
+                {app.pinned ? (
+                  <SidebarMenuBadge aria-label="Pinned">
+                    <Pin className="size-3 rotate-45 fill-yellow-400 text-yellow-400" aria-hidden />
+                  </SidebarMenuBadge>
+                ) : null}
+              </SidebarMenuItem>
+            )
+          })}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
   )
 }

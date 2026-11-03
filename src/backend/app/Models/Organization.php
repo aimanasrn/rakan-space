@@ -2,6 +2,11 @@
 
 namespace App\Models;
 
+use App\Models\Approval\ApprovalDelegation;
+use App\Models\Approval\ApprovalRequest;
+use App\Models\Approval\ApprovalWorkflow;
+use App\Models\Form\Form;
+use App\Models\Form\FormSubmission;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -96,6 +101,53 @@ class Organization extends Model
     public function activities(): HasMany
     {
         return $this->hasMany(Activity::class);
+    }
+
+    public function installedApps(): HasMany
+    {
+        return $this->hasMany(OrganizationApp::class);
+    }
+
+    /** Launcher banners (route parameter {banner}). */
+    public function banners(): HasMany
+    {
+        return $this->hasMany(LauncherBanner::class);
+    }
+
+    /** App access requests (route parameter {accessRequest}). */
+    public function accessRequests(): HasMany
+    {
+        return $this->hasMany(AppAccessRequest::class);
+    }
+
+    /** Route parameter {approvalWorkflow}. */
+    public function approvalWorkflows(): HasMany
+    {
+        return $this->hasMany(ApprovalWorkflow::class);
+    }
+
+    /** Route parameter {approvalRequest}. */
+    public function approvalRequests(): HasMany
+    {
+        return $this->hasMany(ApprovalRequest::class);
+    }
+
+    /** Route parameter {approvalDelegation}. */
+    public function approvalDelegations(): HasMany
+    {
+        return $this->hasMany(ApprovalDelegation::class);
+    }
+
+    /** Route parameter {form}. */
+    public function forms(): HasMany
+    {
+        return $this->hasMany(Form::class);
+    }
+
+    /** Route parameter {formSubmission}. */
+    public function formSubmissions(): HasMany
+    {
+        return $this->hasMany(FormSubmission::class);
     }
 
     public function logoUrl(): ?string

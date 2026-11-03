@@ -9,7 +9,7 @@ import { EmptyState, ErrorState, LoadingRows, PageHeader, RoleBadge, UserAvatar 
 import { ConfirmAction } from "@/components/confirm"
 import { FormAlert, TextField, useFormErrors } from "@/components/form"
 import { InviteForm } from "@/components/invite-form"
-import { PeoplePicker } from "@/components/pickers"
+import { PeoplePicker, PersonSelect } from "@/components/pickers"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -106,6 +106,7 @@ function Directory() {
   const [status, setStatus] = useState("active")
   const [page, setPage] = useState(1)
   const [removing, setRemoving] = useState<Membership | null>(null)
+  const [managing, setManaging] = useState<Membership | null>(null)
   const admin = org.permissions.manage_members
 
   const query = { q: q || undefined, role: role === "all" ? undefined : role, department_id: department === "all" ? undefined : department, status, page, per_page: 25 }
@@ -199,6 +200,7 @@ function Directory() {
                 <TableHead className="min-w-56">Name</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Departments</TableHead>
+                <TableHead>Reports to</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableHead>
                   <span className="sr-only">Actions</span>
@@ -224,6 +226,15 @@ function Directory() {
                     <RoleBadge role={m.role} />
                   </TableCell>
                   <TableCell className="text-muted-foreground">{m.departments?.map((d) => d.name).join(", ") || "—"}</TableCell>
+                  <TableCell className="whitespace-nowrap">
+                    {admin ? (
+                      <Button variant="ghost" size="sm" className="-ml-2 font-normal" onClick={() => setManaging(m)} aria-label={`Change who ${m.user.name} reports to`}>
+                        {m.manager ? m.manager.name : <span className="text-muted-foreground">Set manager</span>}
+                      </Button>
+                    ) : (
+                      <span className="text-muted-foreground">{m.manager?.name ?? "—"}</span>
+                    )}
+                  </TableCell>
                   <TableCell className="whitespace-nowrap text-muted-foreground">{m.joined_at ? formatInstantDate(m.joined_at, org.timezone) : "—"}</TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
@@ -287,6 +298,7 @@ function Directory() {
           </Button>
         </nav>
       ) : null}
+      {managing ? <ManagerDialog membership={managing} onClose={() => setManaging(null)} onSaved={refresh} /> : null}
       <ConfirmAction
         open={!!removing}
         onOpenChange={(o) => !o && setRemoving(null)}
@@ -296,6 +308,56 @@ function Directory() {
         onConfirm={() => (removing ? act(removing, "", "DELETE", undefined, `${removing.user.name} was removed.`) : undefined)}
       />
     </div>
+  )
+}
+
+/** Sets who a member reports to (used for approval routing). */
+function ManagerDialog({ membership, onClose, onSaved }: { membership: Membership; onClose: () => void; onSaved: () => void }) {
+  const { slug } = useWorkspace()
+  const members = useMemberOptions(slug)
+  const [managerId, setManagerId] = useState<number | null>(membership.manager?.id ?? null)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const people = (members.data ?? []).map((m) => m.user).filter((u) => u.id !== membership.user.id)
+
+  async function save() {
+    setPending(true)
+    setError(null)
+    try {
+      await api(orgPath(slug, `/members/${membership.id}/manager`), { method: "PUT", body: { manager_id: managerId } })
+      toast.success(managerId ? `Reporting manager updated for ${membership.user.name}.` : `Reporting manager cleared for ${membership.user.name}.`)
+      onSaved()
+      onClose()
+    } catch (e) {
+      setError(errorMessage(e))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => (o ? null : onClose())}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Who does {membership.user.name} report to?</DialogTitle>
+          <DialogDescription>Approval workflows can route requests to this person.</DialogDescription>
+        </DialogHeader>
+        <FormAlert message={error} />
+        <div className="space-y-2">
+          <Label htmlFor="reporting-manager">Reporting manager</Label>
+          <PersonSelect id="reporting-manager" people={people} value={managerId} onChange={setManagerId} placeholder="No manager" disabled={members.isPending} />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={save} disabled={pending}>
+            {pending ? <Spinner /> : null}
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

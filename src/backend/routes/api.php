@@ -1,13 +1,21 @@
 <?php
 
 use App\Http\Controllers\AnnouncementController;
+use App\Http\Controllers\AppAdminController;
+use App\Http\Controllers\Approval\DelegationController as ApprovalDelegationController;
+use App\Http\Controllers\Approval\RequestController as ApprovalRequestController;
+use App\Http\Controllers\Approval\WorkflowController as ApprovalWorkflowController;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EventController;
+use App\Http\Controllers\Form\FormController;
+use App\Http\Controllers\Form\SubmissionController as FormSubmissionController;
 use App\Http\Controllers\InvitationController;
+use App\Http\Controllers\LauncherBannerController;
+use App\Http\Controllers\LauncherController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\NotificationController;
@@ -79,6 +87,7 @@ Route::middleware('auth:sanctum')->group(function () {
             // Members
             Route::get('members', [MemberController::class, 'index']);
             Route::patch('members/{membership}', [MemberController::class, 'update']);
+            Route::put('members/{membership}/manager', [MemberController::class, 'updateManager']);
             Route::post('members/{membership}/deactivate', [MemberController::class, 'deactivate']);
             Route::post('members/{membership}/reactivate', [MemberController::class, 'reactivate']);
             Route::delete('members/{membership}', [MemberController::class, 'destroy']);
@@ -162,6 +171,68 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('events/{event}', [EventController::class, 'show']);
             Route::put('events/{event}', [EventController::class, 'update']);
             Route::delete('events/{event}', [EventController::class, 'destroy']);
+
+            // App launcher (members)
+            Route::get('launcher', [LauncherController::class, 'index']);
+            Route::get('apps/{appKey}', [LauncherController::class, 'show']);
+            Route::patch('user-apps/{appKey}/pin', [LauncherController::class, 'pin']);
+            Route::post('user-apps/{appKey}/install', [LauncherController::class, 'install']);
+            Route::post('user-apps/{appKey}/request-access', [LauncherController::class, 'requestAccess'])->middleware('throttle:invitations');
+            Route::get('launcher/banners/{banner}/image', [LauncherBannerController::class, 'image']);
+
+            // App launcher (Owner/Admin)
+            Route::get('admin/apps', [AppAdminController::class, 'index']);
+            Route::post('admin/apps/{appKey}/install', [AppAdminController::class, 'install']);
+            Route::delete('admin/apps/{appKey}', [AppAdminController::class, 'uninstall']);
+            Route::put('admin/apps/{appKey}/permissions', [AppAdminController::class, 'updatePermissions']);
+            Route::get('admin/app-requests', [AppAdminController::class, 'requests']);
+            Route::post('admin/app-requests/{accessRequest}/approve', [AppAdminController::class, 'approve']);
+            Route::post('admin/app-requests/{accessRequest}/reject', [AppAdminController::class, 'reject']);
+            Route::get('launcher/banners', [LauncherBannerController::class, 'index']);
+            Route::post('launcher/banners', [LauncherBannerController::class, 'store']);
+            Route::patch('launcher/banners/{banner}', [LauncherBannerController::class, 'update']);
+            Route::delete('launcher/banners/{banner}', [LauncherBannerController::class, 'destroy']);
+            Route::post('launcher/banners/{banner}/image', [LauncherBannerController::class, 'uploadImage'])->middleware('throttle:uploads');
+            Route::delete('launcher/banners/{banner}/image', [LauncherBannerController::class, 'deleteImage']);
+
+            // Approval (participants need no app ability; designers need Approval "admin")
+            Route::prefix('approval')->group(function () {
+                Route::get('summary', [ApprovalRequestController::class, 'summary']);
+                Route::get('requests', [ApprovalRequestController::class, 'index']);
+                Route::post('requests', [ApprovalRequestController::class, 'store']);
+                Route::get('requests/{approvalRequest}', [ApprovalRequestController::class, 'show']);
+                Route::post('requests/{approvalRequest}/decide', [ApprovalRequestController::class, 'decide']);
+                Route::post('requests/{approvalRequest}/resubmit', [ApprovalRequestController::class, 'resubmit']);
+                Route::post('requests/{approvalRequest}/cancel', [ApprovalRequestController::class, 'cancel']);
+                Route::get('workflows', [ApprovalWorkflowController::class, 'index']);
+                Route::post('workflows', [ApprovalWorkflowController::class, 'store']);
+                Route::get('workflows/{approvalWorkflow}', [ApprovalWorkflowController::class, 'show']);
+                Route::put('workflows/{approvalWorkflow}', [ApprovalWorkflowController::class, 'update']);
+                Route::delete('workflows/{approvalWorkflow}', [ApprovalWorkflowController::class, 'destroy']);
+                Route::get('delegations', [ApprovalDelegationController::class, 'index']);
+                Route::post('delegations', [ApprovalDelegationController::class, 'store']);
+                Route::delete('delegations/{approvalDelegation}', [ApprovalDelegationController::class, 'destroy']);
+            });
+
+            // Form
+            Route::middleware('app:form')->group(function () {
+                Route::get('forms', [FormController::class, 'index']);
+                Route::post('forms', [FormController::class, 'store']);
+                Route::get('forms/{form}', [FormController::class, 'show']);
+                Route::patch('forms/{form}', [FormController::class, 'update']);
+                Route::delete('forms/{form}', [FormController::class, 'destroy']);
+                Route::put('forms/{form}/draft', [FormController::class, 'saveDraft']);
+                Route::delete('forms/{form}/draft', [FormController::class, 'discardDraft']);
+                Route::post('forms/{form}/publish', [FormController::class, 'publish']);
+                Route::post('forms/{form}/unpublish', [FormController::class, 'unpublish']);
+                Route::get('forms/{form}/versions', [FormController::class, 'versions']);
+                Route::get('forms/{form}/submissions', [FormSubmissionController::class, 'forForm']);
+                Route::post('forms/{form}/submissions', [FormSubmissionController::class, 'store'])->middleware('throttle:messages');
+                Route::get('form-submissions', [FormSubmissionController::class, 'index']);
+                Route::get('form-submissions/{formSubmission}', [FormSubmissionController::class, 'show']);
+                Route::put('form-submissions/{formSubmission}', [FormSubmissionController::class, 'update']);
+                Route::post('form-submissions/{formSubmission}/withdraw', [FormSubmissionController::class, 'withdraw']);
+            });
 
             // Announcements
             Route::get('announcements', [AnnouncementController::class, 'index']);
