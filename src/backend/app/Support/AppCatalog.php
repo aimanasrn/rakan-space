@@ -78,6 +78,11 @@ class AppCatalog
         // Timesheet: "view" = log and submit your own time; "admin" = every sheet,
         // workspace-wide reports and settings. Managers see their direct reports anyway.
         'timesheet' => ['manager' => ['view'], 'staff' => ['view']],
+        // Helpdesk: "view" = see your own tickets, "create" = raise tickets,
+        // "edit" = work every ticket as an agent (usually chosen people are
+        // made agents in Helpdesk settings instead), "delete" = delete tickets,
+        // "admin" = settings, agents and canned responses.
+        'helpdesk' => ['manager' => ['view', 'create'], 'staff' => ['view', 'create']],
     ];
 
     /**

@@ -90,6 +90,9 @@ Things to try:
 - Sign in as **Hafiz** → **Timesheet**: this week is in progress, last week is waiting
   for Priya. Sign in as **Priya** → **Approval** to approve it, or **Timesheet → Team**
   and **Reports**. **Tan Mei Ling**'s last week was returned with a comment.
+- Sign in as **Daniel** → **Helpdesk** (he is the listed agent): Mei Ling's VPN ticket
+  has an internal note she cannot see, and Hafiz's monitor request is unassigned.
+  Sign in as **Tan Mei Ling** to see the same ticket from the requester's side.
 
 ## Common commands
 
@@ -105,6 +108,7 @@ Things to try:
 | Run reminders now | `docker compose exec backend php artisan rakanspace:send-reminders` |
 | Sync the app catalogue | `docker compose exec backend php artisan rakanspace:sync-apps` |
 | Send approval reminders/escalations now | `docker compose exec backend php artisan rakanspace:approval-sla` |
+| Send Helpdesk SLA alerts and auto-close now | `docker compose exec backend php artisan rakanspace:helpdesk-sla` |
 | Remind members about unsubmitted timesheets now | `docker compose exec backend php artisan rakanspace:timesheet-reminders` |
 
 ## What is implemented
@@ -162,6 +166,11 @@ Things to try:
   configurable workflow (reporting manager by default), return/resubmit,
   withdraw, team view for managers and approvers, reports by project, person,
   task or week with CSV export, and a reminder for unsubmitted weeks.
+- **Helpdesk**: internal service desk. Members raise tickets (with files); agents
+  work queues (assigned to me, unassigned, all), reply or add internal notes,
+  insert canned responses, assign, set status/priority/category. SLA targets per
+  priority with "due soon"/"missed" alerts, auto-close of resolved tickets, and
+  settings for agents, targets and categories.
 - **UI**: collapsible sidebar, workspace switcher, Ctrl/⌘+K search,
   notifications menu, profile menu, light/dark themes, mobile navigation,
   loading/empty/error states, confirmations for destructive actions, keyboard

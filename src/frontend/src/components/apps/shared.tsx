@@ -17,6 +17,7 @@ const APP_STYLE = {
   form: { icon: "clipboard-list", gradient: ["#6366f1", "#8b5cf6"] as [string, string] },
   approval: { icon: "badge-check", gradient: ["#10b981", "#059669"] as [string, string] },
   timesheet: { icon: "clock", gradient: ["#f59e0b", "#ea580c"] as [string, string] },
+  helpdesk: { icon: "life-buoy", gradient: ["#ef4444", "#db2777"] as [string, string] },
 }
 
 /** Page header for module screens: app icon, title, optional back link and actions. */

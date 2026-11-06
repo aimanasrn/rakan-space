@@ -13,6 +13,8 @@ use App\Models\Conversation;
 use App\Models\Event;
 use App\Models\Form\Form;
 use App\Models\Form\FormSubmission;
+use App\Models\Helpdesk\Ticket;
+use App\Models\Helpdesk\TicketMessage;
 use App\Models\LauncherApp;
 use App\Models\LauncherBanner;
 use App\Models\Message;
@@ -357,6 +359,8 @@ class Permissions
             $parent instanceof Project => self::canViewProject($user, $parent),
             $parent instanceof Announcement => self::canViewAnnouncement($user, $parent),
             $parent instanceof FormSubmission => self::canViewSubmission($user, $parent),
+            $parent instanceof TicketMessage => self::canViewTicketMessage($user, $parent),
+            $parent instanceof Ticket => self::canViewTicket($user, $parent),
             default => false,
         };
     }
@@ -669,6 +673,69 @@ class Permissions
         $request = $submission->approval_request_id ? ApprovalRequest::find($submission->approval_request_id) : null;
 
         return $request !== null && self::canViewApprovalRequest($user, $request);
+    }
+
+    // ---------------------------------------------------------------- Helpdesk
+    //
+    // A ticket is visible to its requester and to agents. Agents are members
+    // listed in Helpdesk settings, plus roles with the Helpdesk "edit" ability
+    // (Owners/Admins by default). Internal notes and their files are for agents only.
+
+    public static function isHelpdeskAgent(User $user, int $organizationId): bool
+    {
+        $abilities = self::appAbilitiesFor($user, $organizationId, 'helpdesk');
+        if (! in_array('view', $abilities, true)) {
+            return false;
+        }
+
+        return in_array('edit', $abilities, true)
+            || DB::table('helpdesk_agents')->where('organization_id', $organizationId)->where('user_id', $user->id)->exists();
+    }
+
+    public static function canManageHelpdesk(User $user, int $organizationId): bool
+    {
+        return self::hasAppAbility($user, $organizationId, 'helpdesk', AppAbility::Admin);
+    }
+
+    public static function canRaiseTickets(User $user, int $organizationId): bool
+    {
+        return self::hasAppAbility($user, $organizationId, 'helpdesk', AppAbility::Create);
+    }
+
+    public static function canViewTicket(User $user, Ticket $ticket): bool
+    {
+        if (! self::membership($user, $ticket->organization_id)) {
+            return false;
+        }
+
+        return $ticket->requester_id === $user->id || self::isHelpdeskAgent($user, $ticket->organization_id);
+    }
+
+    public static function canDeleteTicket(User $user, Ticket $ticket): bool
+    {
+        return self::canViewTicket($user, $ticket)
+            && self::hasAppAbility($user, $ticket->organization_id, 'helpdesk', AppAbility::Delete);
+    }
+
+    public static function canViewTicketMessage(User $user, TicketMessage $message): bool
+    {
+        $ticket = $message->relationLoaded('ticket') ? $message->ticket : $message->ticket()->first();
+
+        return $ticket !== null && self::canViewTicket($user, $ticket)
+            && (! $message->is_internal || self::isHelpdeskAgent($user, $ticket->organization_id));
+    }
+
+    public static function visibleTicketsQuery(User $user, int $organizationId): Builder
+    {
+        $query = Ticket::query()->where('helpdesk_tickets.organization_id', $organizationId);
+        if (! self::membership($user, $organizationId)) {
+            return $query->whereRaw('false');
+        }
+        if (self::isHelpdeskAgent($user, $organizationId)) {
+            return $query;
+        }
+
+        return $query->where('helpdesk_tickets.requester_id', $user->id);
     }
 
     // -------------------------------------------------------------- Timesheets

@@ -13,6 +13,9 @@ use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\Form\FormController;
 use App\Http\Controllers\Form\SubmissionController as FormSubmissionController;
+use App\Http\Controllers\Helpdesk\CannedResponseController as HelpdeskCannedResponseController;
+use App\Http\Controllers\Helpdesk\SettingsController as HelpdeskSettingsController;
+use App\Http\Controllers\Helpdesk\TicketController as HelpdeskTicketController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LauncherBannerController;
 use App\Http\Controllers\LauncherController;
@@ -250,6 +253,24 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::get('report', TimesheetReportController::class);
                 Route::get('settings', [TimesheetSettingsController::class, 'show']);
                 Route::put('settings', [TimesheetSettingsController::class, 'update']);
+            });
+
+            // Helpdesk
+            Route::prefix('helpdesk')->middleware('app:helpdesk')->group(function () {
+                Route::get('summary', [HelpdeskTicketController::class, 'summary']);
+                Route::get('agents', [HelpdeskTicketController::class, 'agents']);
+                Route::get('tickets', [HelpdeskTicketController::class, 'index']);
+                Route::post('tickets', [HelpdeskTicketController::class, 'store'])->middleware('throttle:messages');
+                Route::get('tickets/{ticket}', [HelpdeskTicketController::class, 'show']);
+                Route::patch('tickets/{ticket}', [HelpdeskTicketController::class, 'update']);
+                Route::delete('tickets/{ticket}', [HelpdeskTicketController::class, 'destroy']);
+                Route::post('tickets/{ticket}/messages', [HelpdeskTicketController::class, 'reply'])->middleware('throttle:messages');
+                Route::get('canned-responses', [HelpdeskCannedResponseController::class, 'index']);
+                Route::post('canned-responses', [HelpdeskCannedResponseController::class, 'store']);
+                Route::put('canned-responses/{cannedResponse}', [HelpdeskCannedResponseController::class, 'update']);
+                Route::delete('canned-responses/{cannedResponse}', [HelpdeskCannedResponseController::class, 'destroy']);
+                Route::get('settings', [HelpdeskSettingsController::class, 'show']);
+                Route::put('settings', [HelpdeskSettingsController::class, 'update']);
             });
 
             // Announcements

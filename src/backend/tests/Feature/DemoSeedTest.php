@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Approval\ApprovalRequest;
 use App\Models\Form\Form;
 use App\Models\Form\FormSubmission;
+use App\Models\Helpdesk\Ticket;
 use App\Models\Organization;
 use App\Models\Timesheet\Timesheet;
 use App\Support\Approvals\Approvals;
@@ -22,6 +23,9 @@ class DemoSeedTest extends TestCase
         $rakan = Organization::where('slug', 'rakan-tech')->firstOrFail();
         $sheets = Timesheet::where('organization_id', $rakan->id)->pluck('status')->countBy()->all();
         $this->assertSame(['approved' => 1, 'draft' => 1, 'pending_approval' => 1, 'returned' => 1], collect($sheets)->sortKeys()->all());
+
+        $tickets = Ticket::where('organization_id', $rakan->id)->pluck('status')->countBy()->sortKeys()->all();
+        $this->assertSame(['in_progress' => 1, 'open' => 1, 'resolved' => 1], $tickets);
 
         $this->assertSame(4, Form::where('organization_id', $rakan->id)->count());
         $this->assertSame(3, Form::where('organization_id', $rakan->id)->where('status', 'published')->count());

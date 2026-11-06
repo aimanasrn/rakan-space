@@ -584,3 +584,70 @@ export interface TimesheetSettings {
   workflow_id: number | null
   workflows: { id: number; name: string; description: string | null; steps_count: number }[]
 }
+
+// ----------------------------------------------------------------- Helpdesk
+
+export type TicketStatus = "open" | "in_progress" | "waiting" | "resolved" | "closed"
+export type TicketPriority = "low" | "medium" | "high" | "urgent"
+export type SlaState = "met" | "missed" | "due_soon" | "pending" | "none"
+
+export interface SlaTarget {
+  due_at: string | null
+  met_at: string | null
+  state: SlaState
+}
+
+export interface TicketSummary {
+  id: number
+  reference: string
+  subject: string
+  status: TicketStatus
+  priority: TicketPriority
+  category: string | null
+  requester: UserSummary
+  assignee: UserSummary | null
+  sla: { first_response: SlaTarget; resolution: SlaTarget }
+  created_at: string
+  last_activity_at: string | null
+  resolved_at: string | null
+  closed_at: string | null
+}
+
+export interface TicketMessage {
+  id: number
+  body: string
+  internal: boolean
+  author: UserSummary | null
+  from_requester: boolean
+  attachments: Attachment[]
+  created_at: string
+}
+
+export interface TicketDetail extends TicketSummary {
+  description: string
+  attachments: Attachment[]
+  messages: TicketMessage[]
+  activity: { id: number; event: string; actor: string | null; from: string | null; to: string | null; created_at: string }[]
+  permissions: { work: boolean; reply: boolean; resolve: boolean; delete: boolean }
+}
+
+export interface HelpdeskSummary {
+  is_agent: boolean
+  can_raise: boolean
+  can_manage: boolean
+  categories: string[]
+  counts: { my_open: number; assigned: number | null; unassigned: number | null; missed: number | null }
+}
+
+export interface CannedResponse {
+  id: number
+  title: string
+  body: string
+}
+
+export interface HelpdeskSettings {
+  sla: Record<TicketPriority, { first_response_hours: number; resolution_hours: number }>
+  categories: string[]
+  auto_close_days: number
+  agents: UserSummary[]
+}

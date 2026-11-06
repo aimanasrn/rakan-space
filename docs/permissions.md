@@ -134,6 +134,34 @@ installed and the role to have **view** (otherwise 404).
 - Delegations are created by the delegator for themselves only. The delegate must
   be an active member of the same workspace.
 
+### Helpdesk
+
+All `/helpdesk/*` endpoints require the Helpdesk app to be installed and the
+role to have **view** (otherwise 404).
+
+| Ability | Meaning |
+|---|---|
+| view | See your own tickets and reply to them |
+| create | Raise tickets |
+| edit | Agent: see and work every ticket (Owners/Admins by default) |
+| delete | Delete tickets |
+| admin | Settings: agents, SLA targets, categories, auto-close; manage canned responses |
+
+| Who | Can |
+|---|---|
+| Requester | See their ticket and its public replies, reply (reopens a resolved ticket), mark it resolved |
+| Agent (listed in Helpdesk settings, or role with **edit**) | See every ticket, internal notes and their files; reply, add internal notes, assign, change status/priority/category; raise tickets for another member |
+| Anyone else | 404 |
+
+- Agents chosen in settings are filtered to active members of the workspace.
+  Assignees must be agents; "on behalf of" requesters must be active members.
+- Internal notes and their attachments are agents-only (404 for the requester).
+- A closed ticket takes no more replies; only an agent can reopen it.
+- Owners/Admins are agents by default, so they can read every ticket. Use a
+  separate channel for anything that must stay private from them (e.g. HR complaints).
+- Removing a member removes them as an agent there and sends their active tickets
+  back to the queue; their messages and tickets are kept.
+
 ### Timesheet
 
 All `/timesheet/*` endpoints require the Timesheet app to be installed and the

@@ -12,6 +12,8 @@ use App\Models\Department;
 use App\Models\Event;
 use App\Models\Form\Form;
 use App\Models\Form\FormSubmission;
+use App\Models\Helpdesk\Ticket;
+use App\Models\Helpdesk\TicketMessage;
 use App\Models\Invitation;
 use App\Models\LauncherApp;
 use App\Models\LauncherBanner;
@@ -70,6 +72,8 @@ class AppServiceProvider extends ServiceProvider
             'form' => Form::class,
             'form_submission' => FormSubmission::class,
             'timesheet' => Timesheet::class,
+            'helpdesk_ticket' => Ticket::class,
+            'helpdesk_message' => TicketMessage::class,
         ]);
 
         // Modules react to approval outcomes (synchronously, inside the same transaction).
