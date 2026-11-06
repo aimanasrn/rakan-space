@@ -21,8 +21,10 @@ use App\Models\OrganizationMembership;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskComment;
+use App\Models\Timesheet\Timesheet;
 use App\Models\User;
 use App\Support\Forms\SyncSubmissionWithApproval;
+use App\Support\Timesheets\SyncTimesheetWithApproval;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -67,10 +69,12 @@ class AppServiceProvider extends ServiceProvider
             'approval_request' => ApprovalRequest::class,
             'form' => Form::class,
             'form_submission' => FormSubmission::class,
+            'timesheet' => Timesheet::class,
         ]);
 
         // Modules react to approval outcomes (synchronously, inside the same transaction).
         EventFacade::listen(ApprovalRequestStatusChanged::class, [SyncSubmissionWithApproval::class, 'handle']);
+        EventFacade::listen(ApprovalRequestStatusChanged::class, [SyncTimesheetWithApproval::class, 'handle']);
 
         // Workspaces are addressed by slug in URLs.
         Route::bind('organization', fn (string $value) => Organization::where('slug', $value)->firstOrFail());

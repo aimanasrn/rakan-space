@@ -87,6 +87,9 @@ Things to try:
   Finance step above RM 5,000.
 - Sign in as **Daniel** → **Form → Manage forms** → *Purchase Request* to see the
   builder (drag-and-drop fields, show/hide rules, preview, publish versions).
+- Sign in as **Hafiz** → **Timesheet**: this week is in progress, last week is waiting
+  for Priya. Sign in as **Priya** → **Approval** to approve it, or **Timesheet → Team**
+  and **Reports**. **Tan Mei Ling**'s last week was returned with a comment.
 
 ## Common commands
 
@@ -102,6 +105,7 @@ Things to try:
 | Run reminders now | `docker compose exec backend php artisan rakanspace:send-reminders` |
 | Sync the app catalogue | `docker compose exec backend php artisan rakanspace:sync-apps` |
 | Send approval reminders/escalations now | `docker compose exec backend php artisan rakanspace:approval-sla` |
+| Remind members about unsubmitted timesheets now | `docker compose exec backend php artisan rakanspace:timesheet-reminders` |
 
 ## What is implemented
 
@@ -153,6 +157,11 @@ Things to try:
   validation rules, show/hide logic, versions with publish/close, audience by
   role and department, one or many responses, optional approval workflow,
   "my submissions" with status, responses per form.
+- **Timesheet**: weekly grid per project/task (or general time) with notes,
+  "copy last week's rows", 24 h/day limit, submit for approval through a
+  configurable workflow (reporting manager by default), return/resubmit,
+  withdraw, team view for managers and approvers, reports by project, person,
+  task or week with CSV export, and a reminder for unsubmitted weeks.
 - **UI**: collapsible sidebar, workspace switcher, Ctrl/⌘+K search,
   notifications menu, profile menu, light/dark themes, mobile navigation,
   loading/empty/error states, confirmations for destructive actions, keyboard
@@ -195,7 +204,7 @@ Details: [architecture](docs/architecture.md) · [permission matrix](docs/permis
 
 ## Future scope (not implemented)
 
-Attendance and check-in/out · Timesheets · Leave balances · Expense claims ·
+Attendance and check-in/out · Leave balances · Expense claims ·
 Subscription billing · Guest access · Platform
 administration portal · Native mobile apps · External calendar integrations
 (Google/Microsoft) and recurring events · Voice/video calling.

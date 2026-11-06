@@ -134,6 +134,37 @@ installed and the role to have **view** (otherwise 404).
 - Delegations are created by the delegator for themselves only. The delegate must
   be an active member of the same workspace.
 
+### Timesheet
+
+All `/timesheet/*` endpoints require the Timesheet app to be installed and the
+role to have **view** (otherwise 404).
+
+| Ability | Meaning |
+|---|---|
+| view | Log, submit and withdraw your own weeks; see your team's sheets (below) |
+| admin | See every timesheet (**All timesheets**), workspace-wide reports, choose the approval workflow |
+
+| Who | Can see a timesheet |
+|---|---|
+| Its owner | Always; only the owner changes or withdraws it |
+| The owner's **current** reporting manager | Yes (follows the reporting line, so a new manager takes over) |
+| Participants of its approval request (and Approval admins) | Yes |
+| Timesheet **admin** ability (Owners/Admins by default) | Every sheet |
+| Anyone else | 404 |
+
+- Time can be logged only to projects the member contributes to (project member
+  or manager, not archived) and to tasks of that project, or as **General** time.
+  Projects or tasks that don't exist, belong to another workspace or are not
+  available to the member all get the same validation message. Rows already on
+  a sheet may stay after the project is archived or the member leaves it.
+- People who can see a sheet see the project and task names on it, even for a
+  restricted project they are not on (they need them to approve the week).
+- **Reports** count submitted and approved weeks only (never drafts): the sheets
+  the member can see, plus all hours on projects they manage. Admins see everything.
+- Submitted weeks go through the workflow chosen in Timesheet settings. By default
+  a "Timesheet approval" workflow (reporting manager, admin cover when there is
+  none) is created on first use. Pending and approved weeks are locked.
+
 ## Real-time channels
 
 | Channel | Authorised when |
@@ -157,7 +188,7 @@ Removing a member (status `removed`):
 - unassigns their open tasks (completed tasks keep the assignee for history);
 - ends their approval delegations there and hands their waiting approvals on
   (to the other approvers on the step, or to Owners/Admins); their decisions,
-  requests and form responses are kept;
+  requests, form responses and timesheets are kept;
 - keeps their messages, comments, files and activity history;
 - does not touch their memberships in other workspaces;
 - writes an audit event.

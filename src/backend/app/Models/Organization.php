@@ -7,6 +7,7 @@ use App\Models\Approval\ApprovalRequest;
 use App\Models\Approval\ApprovalWorkflow;
 use App\Models\Form\Form;
 use App\Models\Form\FormSubmission;
+use App\Models\Timesheet\Timesheet;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -148,6 +149,12 @@ class Organization extends Model
     public function formSubmissions(): HasMany
     {
         return $this->hasMany(FormSubmission::class);
+    }
+
+    /** Route parameter {timesheet}. */
+    public function timesheets(): HasMany
+    {
+        return $this->hasMany(Timesheet::class);
     }
 
     public function logoUrl(): ?string

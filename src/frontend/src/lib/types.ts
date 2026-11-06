@@ -514,3 +514,73 @@ export interface FormSubmissionDetail extends FormSubmissionSummary {
   attachments: Attachment[]
   approval: { id: number; status: ApprovalStatus; current_step: string | null; can_view: boolean } | null
 }
+
+// ---------------------------------------------------------------- Timesheet
+
+export type TimesheetStatus = "draft" | "pending_approval" | "approved" | "rejected" | "returned"
+
+export interface TimesheetEntry {
+  id?: number
+  project_id: number | null
+  task_id: number | null
+  project_name: string | null
+  task_title: string | null
+  /** YYYY-MM-DD */
+  work_date: string
+  minutes: number
+  note: string | null
+}
+
+export interface TimesheetSummary {
+  /** null for a week with nothing saved yet */
+  id: number | null
+  week_start: string
+  week_end: string
+  status: TimesheetStatus
+  total_minutes: number
+  user?: UserSummary
+  approval_request_id: number | null
+  submitted_at: string | null
+  updated_at: string | null
+  permissions: { edit: boolean; submit: boolean; withdraw: boolean }
+}
+
+export interface TimesheetDetail extends TimesheetSummary {
+  entries: TimesheetEntry[]
+  approval: {
+    id: number
+    status: ApprovalStatus
+    current_step: string | null
+    can_view: boolean
+    comment: string | null
+    decided_by: string | null
+  } | null
+}
+
+export interface TimesheetProjectOption {
+  id: number
+  name: string
+}
+
+export interface TimesheetTaskOption {
+  id: number
+  title: string
+  status: TaskStatus
+  assigned_to_me: boolean
+}
+
+export type TimesheetReportGroup = "project" | "member" | "task" | "week"
+
+export interface TimesheetReport {
+  from: string
+  to: string
+  group_by: TimesheetReportGroup
+  total_minutes: number
+  members: number
+  rows: { key: string; label: string; sublabel: string | null; minutes: number }[]
+}
+
+export interface TimesheetSettings {
+  workflow_id: number | null
+  workflows: { id: number; name: string; description: string | null; steps_count: number }[]
+}

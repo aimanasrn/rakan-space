@@ -20,6 +20,7 @@ use App\Models\OrganizationApp;
 use App\Models\OrganizationMembership;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\Timesheet\Timesheet;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -668,6 +669,86 @@ class Permissions
         $request = $submission->approval_request_id ? ApprovalRequest::find($submission->approval_request_id) : null;
 
         return $request !== null && self::canViewApprovalRequest($user, $request);
+    }
+
+    // -------------------------------------------------------------- Timesheets
+    //
+    // A sheet is visible to its owner, to the owner's current reporting manager,
+    // to participants of its approval request, and to members with the
+    // Timesheet app's "admin" ability. Only the owner changes it.
+
+    public static function canAdministerTimesheets(User $user, int $organizationId): bool
+    {
+        return self::hasAppAbility($user, $organizationId, 'timesheet', AppAbility::Admin);
+    }
+
+    public static function canViewTimesheet(User $user, Timesheet $timesheet): bool
+    {
+        if (! self::membership($user, $timesheet->organization_id)) {
+            return false;
+        }
+        if ($timesheet->user_id === $user->id || self::canAdministerTimesheets($user, $timesheet->organization_id)) {
+            return true;
+        }
+        if (ReportingLine::managerOf($timesheet->organization_id, $timesheet->user_id) === $user->id) {
+            return true;
+        }
+        $request = $timesheet->approval_request_id ? ApprovalRequest::find($timesheet->approval_request_id) : null;
+
+        return $request !== null && self::canViewApprovalRequest($user, $request);
+    }
+
+    /** SQL twin of canViewTimesheet. */
+    public static function visibleTimesheetsQuery(User $user, int $organizationId): Builder
+    {
+        $query = Timesheet::query()->where('timesheets.organization_id', $organizationId);
+        if (! self::membership($user, $organizationId)) {
+            return $query->whereRaw('false');
+        }
+        if (self::canAdministerTimesheets($user, $organizationId)) {
+            return $query;
+        }
+        $approvalAdmin = self::canManageApprovalWorkflows($user, $organizationId);
+
+        return $query->where(fn (Builder $q) => $q
+            ->where('timesheets.user_id', $user->id)
+            ->orWhereIn('timesheets.user_id', self::directReportIdsQuery($user, $organizationId))
+            ->when($approvalAdmin, fn (Builder $w) => $w->orWhereNotNull('timesheets.approval_request_id'))
+            ->orWhereExists(fn ($sub) => $sub->selectRaw('1')->from('approval_step_approvers')
+                ->whereColumn('approval_step_approvers.approval_request_id', 'timesheets.approval_request_id')
+                ->where(fn ($w) => $w->where('approval_step_approvers.user_id', $user->id)->orWhere('approval_step_approvers.delegated_from', $user->id))));
+    }
+
+    /** Members whose reporting manager is the user, in this organisation. */
+    public static function directReportIdsQuery(User $user, int $organizationId): \Illuminate\Database\Query\Builder
+    {
+        return DB::table('organization_memberships')->select('user_id')
+            ->where('organization_id', $organizationId)
+            ->where('manager_id', $user->id);
+    }
+
+    /** Time can be logged to projects the member contributes to (not archived). */
+    public static function canLogTimeToProject(User $user, Project $project): bool
+    {
+        return self::canContributeToProject($user, $project);
+    }
+
+    /** Projects whose hours the user may see in reports: every project for admins, otherwise those they manage. */
+    public static function timesheetReportProjectIdsQuery(User $user, int $organizationId): \Illuminate\Database\Query\Builder
+    {
+        $query = DB::table('projects')->select('projects.id')->where('projects.organization_id', $organizationId);
+        if (! self::membership($user, $organizationId)) {
+            return $query->whereRaw('false');
+        }
+        if (self::isAdmin($user, $organizationId)) {
+            return $query;
+        }
+
+        return $query->where(fn ($q) => $q->where('projects.manager_id', $user->id)
+            ->orWhereExists(fn ($sub) => $sub->selectRaw('1')->from('project_members')
+                ->whereColumn('project_members.project_id', 'projects.id')
+                ->where('project_members.user_id', $user->id)
+                ->where('project_members.role', 'manager')));
     }
 
     // ----------------------------------------------------------------- Reports

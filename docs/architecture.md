@@ -147,6 +147,23 @@ Approvals::submitForApproval($organization, $user, 'form_submission', $id, $work
 - If the form has a workflow, each response is submitted with its non-file
   answers as approval `data`, so step conditions can use field keys.
 
+### Timesheet module (`App\Support\Timesheets`)
+
+- One `timesheets` row per member per week (`week_start` is the Monday, in the
+  organisation's time zone). `PUT /timesheet/weeks/{date}` replaces the week's
+  entries as a whole; each entry is one project/task (or General) on one day,
+  at most 24 h per day. Future weeks cannot be logged.
+- Entries keep a copy of the project and task names, and their foreign keys are
+  set to null when a project or task is deleted, so history survives.
+- Status: `draft` → `pending_approval` → `approved` / `rejected` / `returned`.
+  Submitting calls `Approvals::submitForApproval()` with `hours` and `week_start`
+  as `data` (step conditions can use `hours`, e.g. more than 45).
+  `SyncTimesheetWithApproval` mirrors the request status; withdrawing cancels
+  the request and the week becomes a draft. Editing a rejected week starts a
+  new draft; a returned week is resubmitted on the same request (next round).
+- `rakanspace:timesheet-reminders` (daily, 09:00) reminds members once about
+  past weeks with logged time that were never submitted.
+
 ### Time
 
 - Event times are `timestamptz`, stored in UTC and returned as ISO-8601.

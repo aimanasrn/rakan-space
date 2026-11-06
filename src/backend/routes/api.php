@@ -26,6 +26,9 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SearchController;
 use App\Http\Controllers\TaskCommentController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\Timesheet\ReportController as TimesheetReportController;
+use App\Http\Controllers\Timesheet\SettingsController as TimesheetSettingsController;
+use App\Http\Controllers\Timesheet\TimesheetController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -232,6 +235,21 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::get('form-submissions/{formSubmission}', [FormSubmissionController::class, 'show']);
                 Route::put('form-submissions/{formSubmission}', [FormSubmissionController::class, 'update']);
                 Route::post('form-submissions/{formSubmission}/withdraw', [FormSubmissionController::class, 'withdraw']);
+            });
+
+            // Timesheet ({week} is any date in the week; weeks start on Monday)
+            Route::prefix('timesheet')->middleware('app:timesheet')->group(function () {
+                Route::get('weeks/{week}', [TimesheetController::class, 'week'])->where('week', '\d{4}-\d{2}-\d{2}');
+                Route::put('weeks/{week}', [TimesheetController::class, 'saveWeek'])->where('week', '\d{4}-\d{2}-\d{2}');
+                Route::post('weeks/{week}/submit', [TimesheetController::class, 'submitWeek'])->where('week', '\d{4}-\d{2}-\d{2}');
+                Route::get('sheets', [TimesheetController::class, 'index']);
+                Route::get('sheets/{timesheet}', [TimesheetController::class, 'show']);
+                Route::post('sheets/{timesheet}/withdraw', [TimesheetController::class, 'withdraw']);
+                Route::get('projects', [TimesheetController::class, 'projects']);
+                Route::get('projects/{project}/tasks', [TimesheetController::class, 'tasks']);
+                Route::get('report', TimesheetReportController::class);
+                Route::get('settings', [TimesheetSettingsController::class, 'show']);
+                Route::put('settings', [TimesheetSettingsController::class, 'update']);
             });
 
             // Announcements

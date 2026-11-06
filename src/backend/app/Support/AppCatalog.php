@@ -75,6 +75,9 @@ class AppCatalog
      */
     public const ROLE_DEFAULTS = [
         'form' => ['manager' => ['view', 'create', 'approve'], 'staff' => ['view']],
+        // Timesheet: "view" = log and submit your own time; "admin" = every sheet,
+        // workspace-wide reports and settings. Managers see their direct reports anyway.
+        'timesheet' => ['manager' => ['view'], 'staff' => ['view']],
     ];
 
     /**

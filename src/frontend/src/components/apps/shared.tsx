@@ -10,12 +10,13 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useWorkspace } from "@/components/workspace/workspace-context"
 import { ApiError } from "@/lib/api"
-import type { ApprovalStatus, SubmissionStatus } from "@/lib/types"
+import type { ApprovalStatus, SubmissionStatus, TimesheetStatus } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 const APP_STYLE = {
   form: { icon: "clipboard-list", gradient: ["#6366f1", "#8b5cf6"] as [string, string] },
   approval: { icon: "badge-check", gradient: ["#10b981", "#059669"] as [string, string] },
+  timesheet: { icon: "clock", gradient: ["#f59e0b", "#ea580c"] as [string, string] },
 }
 
 /** Page header for module screens: app icon, title, optional back link and actions. */
@@ -87,18 +88,19 @@ export function ModuleNav({ items }: { items: { href: string; label: string; bad
   )
 }
 
-const STATUS: Record<ApprovalStatus | SubmissionStatus, { label: string; className: string }> = {
+const STATUS: Record<ApprovalStatus | SubmissionStatus | TimesheetStatus, { label: string; className: string }> = {
   pending: { label: "Pending", className: "bg-amber-500/15 text-amber-800 dark:text-amber-300" },
   pending_approval: { label: "Pending approval", className: "bg-amber-500/15 text-amber-800 dark:text-amber-300" },
   submitted: { label: "Submitted", className: "bg-sky-500/15 text-sky-800 dark:text-sky-300" },
   approved: { label: "Approved", className: "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300" },
   rejected: { label: "Rejected", className: "bg-red-500/15 text-red-800 dark:text-red-300" },
   returned: { label: "Returned", className: "bg-violet-500/15 text-violet-800 dark:text-violet-300" },
+  draft: { label: "Draft", className: "bg-muted text-muted-foreground" },
   cancelled: { label: "Withdrawn", className: "bg-muted text-muted-foreground" },
   withdrawn: { label: "Withdrawn", className: "bg-muted text-muted-foreground" },
 }
 
-export function StatusBadge({ status, className }: { status: ApprovalStatus | SubmissionStatus; className?: string }) {
+export function StatusBadge({ status, className }: { status: ApprovalStatus | SubmissionStatus | TimesheetStatus; className?: string }) {
   const s = STATUS[status]
   return <Badge className={cn("border-transparent", s.className, className)}>{s.label}</Badge>
 }
