@@ -147,6 +147,59 @@ Approvals::submitForApproval($organization, $user, 'form_submission', $id, $work
 - If the form has a workflow, each response is submitted with its non-file
   answers as approval `data`, so step conditions can use field keys.
 
+### Opportunity module (`App\Support\Crm\Pipeline`)
+
+- Tables are prefixed `crm_`: stages, accounts, contacts, opportunities, activities.
+  Every reference uses a composite `(id, organization_id)` foreign key.
+- Stages are per organisation (default pipeline created on first use): open stages
+  with a win probability, exactly one **won** and one **lost** stage. Moving into
+  won/lost sets `closed_at`; lost needs a `lost_reason`. Stages with deals cannot
+  be removed or change type.
+- The board loads every visible deal (won/lost from the last 90 days by default);
+  drag-and-drop and a "Move to" menu call `POST /crm/opportunities/{id}/move`.
+- Forecast: open deals by month of expected close, with value × stage probability
+  ("weighted"), plus won value by month closed, from the visible deals only.
+- Follow-up tasks are activities of type `task` with a due date; "My follow-ups"
+  lists the member's open ones. There are no reminders for them yet.
+
+### Helpdesk module (`App\Support\Helpdesk`)
+
+- `helpdesk_tickets` hold the request (subject, description, priority, category,
+  requester, assignee) and its SLA due times; `helpdesk_messages` hold replies and
+  internal notes (`is_internal`). Files attach to the ticket (raised with it) or to
+  a message, and follow `canViewTicket` / `canViewTicketMessage`.
+- Status: `open` → `in_progress` / `waiting` (on requester) → `resolved` → `closed`.
+  An agent's public reply to an open ticket moves it to in progress; the requester's
+  reply to a waiting or resolved ticket sends it back to the agents.
+- SLA targets per priority (hours to first response and to resolution) come from
+  `helpdesk_settings`; due times are fixed when the ticket is raised and recalculated
+  from its creation time when the priority changes. Calendar hours; the clock does
+  not pause while waiting on the requester.
+- `rakanspace:helpdesk-sla` (every 5 minutes) warns the assignee (or the agents)
+  an hour before a target and when it is missed, once per due time, and closes
+  resolved tickets after `auto_close_days`.
+- Agent identity: `Permissions::isHelpdeskAgent()` (listed in `helpdesk_agents` or
+  role with "edit"). New-ticket alerts go to listed agents, or to every agent when
+  none is listed (`Helpdesk::queueRecipientIds()`).
+- No live push yet: the ticket page polls every 30 seconds.
+
+### Timesheet module (`App\Support\Timesheets`)
+
+- One `timesheets` row per member per week (`week_start` is the Monday, in the
+  organisation's time zone). `PUT /timesheet/weeks/{date}` replaces the week's
+  entries as a whole; each entry is one project/task (or General) on one day,
+  at most 24 h per day. Future weeks cannot be logged.
+- Entries keep a copy of the project and task names, and their foreign keys are
+  set to null when a project or task is deleted, so history survives.
+- Status: `draft` → `pending_approval` → `approved` / `rejected` / `returned`.
+  Submitting calls `Approvals::submitForApproval()` with `hours` and `week_start`
+  as `data` (step conditions can use `hours`, e.g. more than 45).
+  `SyncTimesheetWithApproval` mirrors the request status; withdrawing cancels
+  the request and the week becomes a draft. Editing a rejected week starts a
+  new draft; a returned week is resubmitted on the same request (next round).
+- `rakanspace:timesheet-reminders` (daily, 09:00) reminds members once about
+  past weeks with logged time that were never submitted.
+
 ### Time
 
 - Event times are `timestamptz`, stored in UTC and returned as ISO-8601.

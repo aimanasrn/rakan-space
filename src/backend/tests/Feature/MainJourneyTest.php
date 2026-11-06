@@ -68,7 +68,8 @@ class MainJourneyTest extends TestCase
         ])->assertCreated();
 
         // 6. Relevant users receive notifications.
-        $this->as($farid)->getJson("{$base}/notifications")->assertOk()->assertJsonPath('data.0.type', 'task.assigned');
+        // Several notifications can share a timestamp, so do not depend on their order.
+        $this->assertContains('task.assigned', $this->as($farid)->getJson("{$base}/notifications")->assertOk()->collect('data')->pluck('type')->all());
         $ownerTypes = $this->as($owner)->getJson("{$base}/notifications")->collect('data')->pluck('type')->all();
         $this->assertContains('task.updated', $ownerTypes);
         $this->assertContains('mention', $ownerTypes);

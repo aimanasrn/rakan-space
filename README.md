@@ -87,6 +87,15 @@ Things to try:
   Finance step above RM 5,000.
 - Sign in as **Daniel** → **Form → Manage forms** → *Purchase Request* to see the
   builder (drag-and-drop fields, show/hide rules, preview, publish versions).
+- Sign in as **Hafiz** → **Timesheet**: this week is in progress, last week is waiting
+  for Priya. Sign in as **Priya** → **Approval** to approve it, or **Timesheet → Team**
+  and **Reports**. **Tan Mei Ling**'s last week was returned with a comment.
+- Sign in as **Daniel** → **Helpdesk** (he is the listed agent): Mei Ling's VPN ticket
+  has an internal note she cannot see, and Hafiz's monitor request is unassigned.
+  Sign in as **Tan Mei Ling** to see the same ticket from the requester's side.
+- Sign in as **Hafiz** → **Opportunity**: he sees only his Kedai Maju deals. Sign in
+  as **Priya** (his manager) to see the whole pipeline and the forecast; drag a deal
+  to *Won* or *Lost*.
 
 ## Common commands
 
@@ -102,6 +111,8 @@ Things to try:
 | Run reminders now | `docker compose exec backend php artisan rakanspace:send-reminders` |
 | Sync the app catalogue | `docker compose exec backend php artisan rakanspace:sync-apps` |
 | Send approval reminders/escalations now | `docker compose exec backend php artisan rakanspace:approval-sla` |
+| Send Helpdesk SLA alerts and auto-close now | `docker compose exec backend php artisan rakanspace:helpdesk-sla` |
+| Remind members about unsubmitted timesheets now | `docker compose exec backend php artisan rakanspace:timesheet-reminders` |
 
 ## What is implemented
 
@@ -153,6 +164,20 @@ Things to try:
   validation rules, show/hide logic, versions with publish/close, audience by
   role and department, one or many responses, optional approval workflow,
   "my submissions" with status, responses per form.
+- **Timesheet**: weekly grid per project/task (or general time) with notes,
+  "copy last week's rows", 24 h/day limit, submit for approval through a
+  configurable workflow (reporting manager by default), return/resubmit,
+  withdraw, team view for managers and approvers, reports by project, person,
+  task or week with CSV export, and a reminder for unsubmitted weeks.
+- **Helpdesk**: internal service desk. Members raise tickets (with files); agents
+  work queues (assigned to me, unassigned, all), reply or add internal notes,
+  insert canned responses, assign, set status/priority/category. SLA targets per
+  priority with "due soon"/"missed" alerts, auto-close of resolved tickets, and
+  settings for agents, targets and categories.
+- **Opportunity**: shared accounts and contacts, a Kanban pipeline (drag-and-drop
+  or "Move to"), won/lost with a reason, notes/calls/meetings/emails and follow-up
+  tasks, a weighted forecast by month, and editable pipeline stages. Staff see their
+  own deals; reporting managers and sales managers see their team's.
 - **UI**: collapsible sidebar, workspace switcher, Ctrl/⌘+K search,
   notifications menu, profile menu, light/dark themes, mobile navigation,
   loading/empty/error states, confirmations for destructive actions, keyboard
@@ -195,7 +220,7 @@ Details: [architecture](docs/architecture.md) · [permission matrix](docs/permis
 
 ## Future scope (not implemented)
 
-Attendance and check-in/out · Timesheets · Leave balances · Expense claims ·
+Attendance and check-in/out · Leave balances · Expense claims ·
 Subscription billing · Guest access · Platform
 administration portal · Native mobile apps · External calendar integrations
 (Google/Microsoft) and recurring events · Voice/video calling.

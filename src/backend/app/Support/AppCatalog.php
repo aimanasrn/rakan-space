@@ -75,6 +75,18 @@ class AppCatalog
      */
     public const ROLE_DEFAULTS = [
         'form' => ['manager' => ['view', 'create', 'approve'], 'staff' => ['view']],
+        // Timesheet: "view" = log and submit your own time; "admin" = every sheet,
+        // workspace-wide reports and settings. Managers see their direct reports anyway.
+        'timesheet' => ['manager' => ['view'], 'staff' => ['view']],
+        // Helpdesk: "view" = see your own tickets, "create" = raise tickets,
+        // "edit" = work every ticket as an agent (usually chosen people are
+        // made agents in Helpdesk settings instead), "delete" = delete tickets,
+        // "admin" = settings, agents and canned responses.
+        'helpdesk' => ['manager' => ['view', 'create'], 'staff' => ['view', 'create']],
+        // Opportunity: "view" = the shared account/contact directory and your own
+        // opportunities, "create" = add records, "edit" = see and change every
+        // opportunity (sales managers), "delete" = delete records, "admin" = pipeline stages.
+        'opportunity' => ['manager' => ['view', 'create', 'edit'], 'staff' => ['view', 'create']],
     ];
 
     /**

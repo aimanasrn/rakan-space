@@ -514,3 +514,245 @@ export interface FormSubmissionDetail extends FormSubmissionSummary {
   attachments: Attachment[]
   approval: { id: number; status: ApprovalStatus; current_step: string | null; can_view: boolean } | null
 }
+
+// ---------------------------------------------------------------- Timesheet
+
+export type TimesheetStatus = "draft" | "pending_approval" | "approved" | "rejected" | "returned"
+
+export interface TimesheetEntry {
+  id?: number
+  project_id: number | null
+  task_id: number | null
+  project_name: string | null
+  task_title: string | null
+  /** YYYY-MM-DD */
+  work_date: string
+  minutes: number
+  note: string | null
+}
+
+export interface TimesheetSummary {
+  /** null for a week with nothing saved yet */
+  id: number | null
+  week_start: string
+  week_end: string
+  status: TimesheetStatus
+  total_minutes: number
+  user?: UserSummary
+  approval_request_id: number | null
+  submitted_at: string | null
+  updated_at: string | null
+  permissions: { edit: boolean; submit: boolean; withdraw: boolean }
+}
+
+export interface TimesheetDetail extends TimesheetSummary {
+  entries: TimesheetEntry[]
+  approval: {
+    id: number
+    status: ApprovalStatus
+    current_step: string | null
+    can_view: boolean
+    comment: string | null
+    decided_by: string | null
+  } | null
+}
+
+export interface TimesheetProjectOption {
+  id: number
+  name: string
+}
+
+export interface TimesheetTaskOption {
+  id: number
+  title: string
+  status: TaskStatus
+  assigned_to_me: boolean
+}
+
+export type TimesheetReportGroup = "project" | "member" | "task" | "week"
+
+export interface TimesheetReport {
+  from: string
+  to: string
+  group_by: TimesheetReportGroup
+  total_minutes: number
+  members: number
+  rows: { key: string; label: string; sublabel: string | null; minutes: number }[]
+}
+
+export interface TimesheetSettings {
+  workflow_id: number | null
+  workflows: { id: number; name: string; description: string | null; steps_count: number }[]
+}
+
+// ----------------------------------------------------------------- Helpdesk
+
+export type TicketStatus = "open" | "in_progress" | "waiting" | "resolved" | "closed"
+export type TicketPriority = "low" | "medium" | "high" | "urgent"
+export type SlaState = "met" | "missed" | "due_soon" | "pending" | "none"
+
+export interface SlaTarget {
+  due_at: string | null
+  met_at: string | null
+  state: SlaState
+}
+
+export interface TicketSummary {
+  id: number
+  reference: string
+  subject: string
+  status: TicketStatus
+  priority: TicketPriority
+  category: string | null
+  requester: UserSummary
+  assignee: UserSummary | null
+  sla: { first_response: SlaTarget; resolution: SlaTarget }
+  created_at: string
+  last_activity_at: string | null
+  resolved_at: string | null
+  closed_at: string | null
+}
+
+export interface TicketMessage {
+  id: number
+  body: string
+  internal: boolean
+  author: UserSummary | null
+  from_requester: boolean
+  attachments: Attachment[]
+  created_at: string
+}
+
+export interface TicketDetail extends TicketSummary {
+  description: string
+  attachments: Attachment[]
+  messages: TicketMessage[]
+  activity: { id: number; event: string; actor: string | null; from: string | null; to: string | null; created_at: string }[]
+  permissions: { work: boolean; reply: boolean; resolve: boolean; delete: boolean }
+}
+
+export interface HelpdeskSummary {
+  is_agent: boolean
+  can_raise: boolean
+  can_manage: boolean
+  categories: string[]
+  counts: { my_open: number; assigned: number | null; unassigned: number | null; missed: number | null }
+}
+
+export interface CannedResponse {
+  id: number
+  title: string
+  body: string
+}
+
+export interface HelpdeskSettings {
+  sla: Record<TicketPriority, { first_response_hours: number; resolution_hours: number }>
+  categories: string[]
+  auto_close_days: number
+  agents: UserSummary[]
+}
+
+// -------------------------------------------------------- Opportunity (CRM)
+
+export type StageKind = "open" | "won" | "lost"
+
+export interface CrmStage {
+  id: number
+  name: string
+  position: number
+  probability: number
+  kind: StageKind
+}
+
+export interface CrmRef {
+  id: number
+  name: string
+}
+
+export interface CrmSummary {
+  can_create: boolean
+  see_all: boolean
+  can_delete: boolean
+  can_manage_pipeline: boolean
+  currency: string
+  stages: CrmStage[]
+  open_tasks: number
+}
+
+export interface CrmOpportunity {
+  id: number
+  name: string
+  amount: number
+  stage_id: number
+  account: CrmRef | null
+  contact: CrmRef | null
+  owner: UserSummary | null
+  expected_close_date: string | null
+  lost_reason: string | null
+  closed_at: string | null
+  position: number
+  updated_at: string | null
+  permissions: { edit: boolean }
+}
+
+export type CrmActivityType = "note" | "call" | "meeting" | "email" | "task"
+
+export interface CrmActivity {
+  id: number
+  type: CrmActivityType
+  subject: string
+  body: string | null
+  due_at: string | null
+  done_at: string | null
+  user: UserSummary | null
+  opportunity: CrmRef | null
+  account: CrmRef | null
+  created_at: string
+  permissions: { edit: boolean }
+}
+
+export interface CrmOpportunityDetail extends CrmOpportunity {
+  description: string | null
+  activities: CrmActivity[]
+  history: { id: number; event: string; actor: string | null; from: string | null; to: string | null; created_at: string }[]
+  permissions: { edit: boolean; delete: boolean; reassign: boolean }
+}
+
+export interface CrmAccount {
+  id: number
+  name: string
+  industry: string | null
+  website: string | null
+  phone: string | null
+  address: string | null
+  notes: string | null
+  owner: UserSummary | null
+  contacts_count: number | null
+  updated_at: string | null
+  permissions: { edit: boolean; delete: boolean }
+}
+
+export interface CrmContact {
+  id: number
+  name: string
+  email: string | null
+  phone: string | null
+  job_title: string | null
+  account: CrmRef | null
+  permissions: { edit: boolean; delete: boolean }
+}
+
+export interface CrmAccountDetail extends CrmAccount {
+  contacts: CrmContact[]
+  opportunities: CrmOpportunity[]
+  activities: CrmActivity[]
+}
+
+export interface CrmForecast {
+  currency: string
+  current_month: string
+  months: { month: string; open_amount: number; weighted_amount: number; won_amount: number; count: number }[]
+  overdue: { open_amount: number; weighted_amount: number; count: number }
+  undated: { open_amount: number; weighted_amount: number; count: number }
+  stages: (CrmStage & { count: number; amount: number })[]
+}

@@ -8,10 +8,14 @@ use App\Models\AppAccessRequest;
 use App\Models\Approval\ApprovalRequest;
 use App\Models\Approval\ApprovalWorkflow;
 use App\Models\Conversation;
+use App\Models\Crm\Account as CrmAccount;
+use App\Models\Crm\Opportunity;
 use App\Models\Department;
 use App\Models\Event;
 use App\Models\Form\Form;
 use App\Models\Form\FormSubmission;
+use App\Models\Helpdesk\Ticket;
+use App\Models\Helpdesk\TicketMessage;
 use App\Models\Invitation;
 use App\Models\LauncherApp;
 use App\Models\LauncherBanner;
@@ -21,8 +25,10 @@ use App\Models\OrganizationMembership;
 use App\Models\Project;
 use App\Models\Task;
 use App\Models\TaskComment;
+use App\Models\Timesheet\Timesheet;
 use App\Models\User;
 use App\Support\Forms\SyncSubmissionWithApproval;
+use App\Support\Timesheets\SyncTimesheetWithApproval;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -67,10 +73,16 @@ class AppServiceProvider extends ServiceProvider
             'approval_request' => ApprovalRequest::class,
             'form' => Form::class,
             'form_submission' => FormSubmission::class,
+            'timesheet' => Timesheet::class,
+            'helpdesk_ticket' => Ticket::class,
+            'helpdesk_message' => TicketMessage::class,
+            'crm_account' => CrmAccount::class,
+            'crm_opportunity' => Opportunity::class,
         ]);
 
         // Modules react to approval outcomes (synchronously, inside the same transaction).
         EventFacade::listen(ApprovalRequestStatusChanged::class, [SyncSubmissionWithApproval::class, 'handle']);
+        EventFacade::listen(ApprovalRequestStatusChanged::class, [SyncTimesheetWithApproval::class, 'handle']);
 
         // Workspaces are addressed by slug in URLs.
         Route::bind('organization', fn (string $value) => Organization::where('slug', $value)->firstOrFail());

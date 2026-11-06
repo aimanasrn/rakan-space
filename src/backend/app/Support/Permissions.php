@@ -10,9 +10,15 @@ use App\Models\Approval\ApprovalRequest;
 use App\Models\Approval\ApprovalStepApprover;
 use App\Models\Attachment;
 use App\Models\Conversation;
+use App\Models\Crm\Account as CrmAccount;
+use App\Models\Crm\Activity as CrmActivity;
+use App\Models\Crm\Contact as CrmContact;
+use App\Models\Crm\Opportunity;
 use App\Models\Event;
 use App\Models\Form\Form;
 use App\Models\Form\FormSubmission;
+use App\Models\Helpdesk\Ticket;
+use App\Models\Helpdesk\TicketMessage;
 use App\Models\LauncherApp;
 use App\Models\LauncherBanner;
 use App\Models\Message;
@@ -20,6 +26,7 @@ use App\Models\OrganizationApp;
 use App\Models\OrganizationMembership;
 use App\Models\Project;
 use App\Models\Task;
+use App\Models\Timesheet\Timesheet;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -356,6 +363,8 @@ class Permissions
             $parent instanceof Project => self::canViewProject($user, $parent),
             $parent instanceof Announcement => self::canViewAnnouncement($user, $parent),
             $parent instanceof FormSubmission => self::canViewSubmission($user, $parent),
+            $parent instanceof TicketMessage => self::canViewTicketMessage($user, $parent),
+            $parent instanceof Ticket => self::canViewTicket($user, $parent),
             default => false,
         };
     }
@@ -668,6 +677,261 @@ class Permissions
         $request = $submission->approval_request_id ? ApprovalRequest::find($submission->approval_request_id) : null;
 
         return $request !== null && self::canViewApprovalRequest($user, $request);
+    }
+
+    // ------------------------------------------------------------- Opportunity
+    //
+    // Accounts and contacts are a shared directory for everyone with the app.
+    // An opportunity is visible to its owner, the owner's current reporting
+    // manager, and members with the Opportunity "edit" ability (sales managers;
+    // Owners/Admins by default). Only the owner and "edit" members change it.
+
+    public static function crmAbilities(User $user, int $organizationId): array
+    {
+        return self::membership($user, $organizationId) ? self::appAbilitiesFor($user, $organizationId, 'opportunity') : [];
+    }
+
+    public static function canUseCrm(User $user, int $organizationId): bool
+    {
+        return in_array('view', self::crmAbilities($user, $organizationId), true);
+    }
+
+    public static function canSeeAllOpportunities(User $user, int $organizationId): bool
+    {
+        return in_array('edit', self::crmAbilities($user, $organizationId), true);
+    }
+
+    public static function canCreateCrmRecords(User $user, int $organizationId): bool
+    {
+        return in_array('create', self::crmAbilities($user, $organizationId), true);
+    }
+
+    public static function canManagePipeline(User $user, int $organizationId): bool
+    {
+        return in_array('admin', self::crmAbilities($user, $organizationId), true);
+    }
+
+    public static function canViewOpportunity(User $user, Opportunity $opportunity): bool
+    {
+        if (! self::canUseCrm($user, $opportunity->organization_id)) {
+            return false;
+        }
+
+        return $opportunity->owner_id === $user->id
+            || self::canSeeAllOpportunities($user, $opportunity->organization_id)
+            || ($opportunity->owner_id && ReportingLine::managerOf($opportunity->organization_id, $opportunity->owner_id) === $user->id);
+    }
+
+    public static function canEditOpportunity(User $user, Opportunity $opportunity): bool
+    {
+        return self::canUseCrm($user, $opportunity->organization_id)
+            && ($opportunity->owner_id === $user->id || self::canSeeAllOpportunities($user, $opportunity->organization_id));
+    }
+
+    public static function canDeleteCrmRecords(User $user, int $organizationId): bool
+    {
+        return in_array('delete', self::crmAbilities($user, $organizationId), true);
+    }
+
+    /** SQL twin of canViewOpportunity. */
+    public static function visibleOpportunitiesQuery(User $user, int $organizationId): Builder
+    {
+        $query = Opportunity::query()->where('crm_opportunities.organization_id', $organizationId);
+        if (! self::canUseCrm($user, $organizationId)) {
+            return $query->whereRaw('false');
+        }
+        if (self::canSeeAllOpportunities($user, $organizationId)) {
+            return $query;
+        }
+
+        return $query->where(fn (Builder $q) => $q->where('crm_opportunities.owner_id', $user->id)
+            ->orWhereIn('crm_opportunities.owner_id', self::directReportIdsQuery($user, $organizationId)));
+    }
+
+    public static function canViewAccount(User $user, CrmAccount $account): bool
+    {
+        return self::canUseCrm($user, $account->organization_id);
+    }
+
+    /** Account owner, its creator, or "edit" members. */
+    public static function canEditAccount(User $user, CrmAccount $account): bool
+    {
+        return self::canUseCrm($user, $account->organization_id)
+            && ($account->owner_id === $user->id || $account->created_by === $user->id || self::canSeeAllOpportunities($user, $account->organization_id));
+    }
+
+    public static function canEditContact(User $user, CrmContact $contact): bool
+    {
+        if (! self::canUseCrm($user, $contact->organization_id)) {
+            return false;
+        }
+        if ($contact->created_by === $user->id || self::canSeeAllOpportunities($user, $contact->organization_id)) {
+            return true;
+        }
+        $account = $contact->account_id ? CrmAccount::find($contact->account_id) : null;
+
+        return $account !== null && self::canEditAccount($user, $account);
+    }
+
+    /** Activities follow their opportunity; account-only activities follow the (shared) account. */
+    public static function canViewCrmActivity(User $user, CrmActivity $activity): bool
+    {
+        if ($activity->opportunity_id) {
+            $opportunity = Opportunity::find($activity->opportunity_id);
+
+            return $opportunity !== null && self::canViewOpportunity($user, $opportunity);
+        }
+
+        return self::canUseCrm($user, $activity->organization_id);
+    }
+
+    public static function canEditCrmActivity(User $user, CrmActivity $activity): bool
+    {
+        return self::canViewCrmActivity($user, $activity)
+            && ($activity->user_id === $user->id || self::canSeeAllOpportunities($user, $activity->organization_id));
+    }
+
+    // ---------------------------------------------------------------- Helpdesk
+    //
+    // A ticket is visible to its requester and to agents. Agents are members
+    // listed in Helpdesk settings, plus roles with the Helpdesk "edit" ability
+    // (Owners/Admins by default). Internal notes and their files are for agents only.
+
+    public static function isHelpdeskAgent(User $user, int $organizationId): bool
+    {
+        $abilities = self::appAbilitiesFor($user, $organizationId, 'helpdesk');
+        if (! in_array('view', $abilities, true)) {
+            return false;
+        }
+
+        return in_array('edit', $abilities, true)
+            || DB::table('helpdesk_agents')->where('organization_id', $organizationId)->where('user_id', $user->id)->exists();
+    }
+
+    public static function canManageHelpdesk(User $user, int $organizationId): bool
+    {
+        return self::hasAppAbility($user, $organizationId, 'helpdesk', AppAbility::Admin);
+    }
+
+    public static function canRaiseTickets(User $user, int $organizationId): bool
+    {
+        return self::hasAppAbility($user, $organizationId, 'helpdesk', AppAbility::Create);
+    }
+
+    public static function canViewTicket(User $user, Ticket $ticket): bool
+    {
+        if (! self::membership($user, $ticket->organization_id)) {
+            return false;
+        }
+
+        return $ticket->requester_id === $user->id || self::isHelpdeskAgent($user, $ticket->organization_id);
+    }
+
+    public static function canDeleteTicket(User $user, Ticket $ticket): bool
+    {
+        return self::canViewTicket($user, $ticket)
+            && self::hasAppAbility($user, $ticket->organization_id, 'helpdesk', AppAbility::Delete);
+    }
+
+    public static function canViewTicketMessage(User $user, TicketMessage $message): bool
+    {
+        $ticket = $message->relationLoaded('ticket') ? $message->ticket : $message->ticket()->first();
+
+        return $ticket !== null && self::canViewTicket($user, $ticket)
+            && (! $message->is_internal || self::isHelpdeskAgent($user, $ticket->organization_id));
+    }
+
+    public static function visibleTicketsQuery(User $user, int $organizationId): Builder
+    {
+        $query = Ticket::query()->where('helpdesk_tickets.organization_id', $organizationId);
+        if (! self::membership($user, $organizationId)) {
+            return $query->whereRaw('false');
+        }
+        if (self::isHelpdeskAgent($user, $organizationId)) {
+            return $query;
+        }
+
+        return $query->where('helpdesk_tickets.requester_id', $user->id);
+    }
+
+    // -------------------------------------------------------------- Timesheets
+    //
+    // A sheet is visible to its owner, to the owner's current reporting manager,
+    // to participants of its approval request, and to members with the
+    // Timesheet app's "admin" ability. Only the owner changes it.
+
+    public static function canAdministerTimesheets(User $user, int $organizationId): bool
+    {
+        return self::hasAppAbility($user, $organizationId, 'timesheet', AppAbility::Admin);
+    }
+
+    public static function canViewTimesheet(User $user, Timesheet $timesheet): bool
+    {
+        if (! self::membership($user, $timesheet->organization_id)) {
+            return false;
+        }
+        if ($timesheet->user_id === $user->id || self::canAdministerTimesheets($user, $timesheet->organization_id)) {
+            return true;
+        }
+        if (ReportingLine::managerOf($timesheet->organization_id, $timesheet->user_id) === $user->id) {
+            return true;
+        }
+        $request = $timesheet->approval_request_id ? ApprovalRequest::find($timesheet->approval_request_id) : null;
+
+        return $request !== null && self::canViewApprovalRequest($user, $request);
+    }
+
+    /** SQL twin of canViewTimesheet. */
+    public static function visibleTimesheetsQuery(User $user, int $organizationId): Builder
+    {
+        $query = Timesheet::query()->where('timesheets.organization_id', $organizationId);
+        if (! self::membership($user, $organizationId)) {
+            return $query->whereRaw('false');
+        }
+        if (self::canAdministerTimesheets($user, $organizationId)) {
+            return $query;
+        }
+        $approvalAdmin = self::canManageApprovalWorkflows($user, $organizationId);
+
+        return $query->where(fn (Builder $q) => $q
+            ->where('timesheets.user_id', $user->id)
+            ->orWhereIn('timesheets.user_id', self::directReportIdsQuery($user, $organizationId))
+            ->when($approvalAdmin, fn (Builder $w) => $w->orWhereNotNull('timesheets.approval_request_id'))
+            ->orWhereExists(fn ($sub) => $sub->selectRaw('1')->from('approval_step_approvers')
+                ->whereColumn('approval_step_approvers.approval_request_id', 'timesheets.approval_request_id')
+                ->where(fn ($w) => $w->where('approval_step_approvers.user_id', $user->id)->orWhere('approval_step_approvers.delegated_from', $user->id))));
+    }
+
+    /** Members whose reporting manager is the user, in this organisation. */
+    public static function directReportIdsQuery(User $user, int $organizationId): \Illuminate\Database\Query\Builder
+    {
+        return DB::table('organization_memberships')->select('user_id')
+            ->where('organization_id', $organizationId)
+            ->where('manager_id', $user->id);
+    }
+
+    /** Time can be logged to projects the member contributes to (not archived). */
+    public static function canLogTimeToProject(User $user, Project $project): bool
+    {
+        return self::canContributeToProject($user, $project);
+    }
+
+    /** Projects whose hours the user may see in reports: every project for admins, otherwise those they manage. */
+    public static function timesheetReportProjectIdsQuery(User $user, int $organizationId): \Illuminate\Database\Query\Builder
+    {
+        $query = DB::table('projects')->select('projects.id')->where('projects.organization_id', $organizationId);
+        if (! self::membership($user, $organizationId)) {
+            return $query->whereRaw('false');
+        }
+        if (self::isAdmin($user, $organizationId)) {
+            return $query;
+        }
+
+        return $query->where(fn ($q) => $q->where('projects.manager_id', $user->id)
+            ->orWhereExists(fn ($sub) => $sub->selectRaw('1')->from('project_members')
+                ->whereColumn('project_members.project_id', 'projects.id')
+                ->where('project_members.user_id', $user->id)
+                ->where('project_members.role', 'manager')));
     }
 
     // ----------------------------------------------------------------- Reports

@@ -176,6 +176,9 @@ class DemoSeeder extends Seeder
 
         // Forms and approvals (needs the reporting lines above).
         (new FormApprovalDemoSeeder)->rakanTech($org, $this->users);
+        (new TimesheetDemoSeeder)->rakanTech($org, $this->users);
+        (new HelpdeskDemoSeeder)->rakanTech($org, $this->users);
+        (new CrmDemoSeeder)->rakanTech($org, $this->users);
     }
 
     private function seedKopiKita(): void

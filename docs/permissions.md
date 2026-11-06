@@ -134,6 +134,94 @@ installed and the role to have **view** (otherwise 404).
 - Delegations are created by the delegator for themselves only. The delegate must
   be an active member of the same workspace.
 
+### Helpdesk
+
+All `/helpdesk/*` endpoints require the Helpdesk app to be installed and the
+role to have **view** (otherwise 404).
+
+| Ability | Meaning |
+|---|---|
+| view | See your own tickets and reply to them |
+| create | Raise tickets |
+| edit | Agent: see and work every ticket (Owners/Admins by default) |
+| delete | Delete tickets |
+| admin | Settings: agents, SLA targets, categories, auto-close; manage canned responses |
+
+| Who | Can |
+|---|---|
+| Requester | See their ticket and its public replies, reply (reopens a resolved ticket), mark it resolved |
+| Agent (listed in Helpdesk settings, or role with **edit**) | See every ticket, internal notes and their files; reply, add internal notes, assign, change status/priority/category; raise tickets for another member |
+| Anyone else | 404 |
+
+- Agents chosen in settings are filtered to active members of the workspace.
+  Assignees must be agents; "on behalf of" requesters must be active members.
+- Internal notes and their attachments are agents-only (404 for the requester).
+- A closed ticket takes no more replies; only an agent can reopen it.
+- Owners/Admins are agents by default, so they can read every ticket. Use a
+  separate channel for anything that must stay private from them (e.g. HR complaints).
+- Removing a member removes them as an agent there and sends their active tickets
+  back to the queue; their messages and tickets are kept.
+
+### Opportunity (CRM)
+
+All `/crm/*` endpoints require the Opportunity app to be installed and the role
+to have **view** (otherwise 404).
+
+| Ability | Meaning |
+|---|---|
+| view | The shared account/contact directory; your own opportunities |
+| create | Add accounts, contacts and opportunities |
+| edit | Sales manager: see and change **every** opportunity, give deals to others (Managers by default) |
+| delete | Delete accounts, contacts and opportunities (Owners/Admins by default) |
+| admin | Edit pipeline stages |
+
+| Who | Opportunity |
+|---|---|
+| Its owner | See and change |
+| The owner's **current** reporting manager | See (read-only) |
+| **edit** ability | See and change every opportunity |
+| Anyone else | 404 (and not listed, not in the forecast, not on account pages) |
+
+- Accounts and contacts are visible to everyone with the app; they can be edited
+  by their owner/creator and **edit** members.
+- Activities follow their opportunity; activities logged on an account follow the account.
+- Account, contact, stage and owner IDs are resolved inside the workspace. Owners
+  must be active members who can use the app; only **edit** members may give a
+  deal to someone else.
+- Removing a member keeps their opportunities (owner unchanged) for history; a
+  sales manager can hand them over.
+
+### Timesheet
+
+All `/timesheet/*` endpoints require the Timesheet app to be installed and the
+role to have **view** (otherwise 404).
+
+| Ability | Meaning |
+|---|---|
+| view | Log, submit and withdraw your own weeks; see your team's sheets (below) |
+| admin | See every timesheet (**All timesheets**), workspace-wide reports, choose the approval workflow |
+
+| Who | Can see a timesheet |
+|---|---|
+| Its owner | Always; only the owner changes or withdraws it |
+| The owner's **current** reporting manager | Yes (follows the reporting line, so a new manager takes over) |
+| Participants of its approval request (and Approval admins) | Yes |
+| Timesheet **admin** ability (Owners/Admins by default) | Every sheet |
+| Anyone else | 404 |
+
+- Time can be logged only to projects the member contributes to (project member
+  or manager, not archived) and to tasks of that project, or as **General** time.
+  Projects or tasks that don't exist, belong to another workspace or are not
+  available to the member all get the same validation message. Rows already on
+  a sheet may stay after the project is archived or the member leaves it.
+- People who can see a sheet see the project and task names on it, even for a
+  restricted project they are not on (they need them to approve the week).
+- **Reports** count submitted and approved weeks only (never drafts): the sheets
+  the member can see, plus all hours on projects they manage. Admins see everything.
+- Submitted weeks go through the workflow chosen in Timesheet settings. By default
+  a "Timesheet approval" workflow (reporting manager, admin cover when there is
+  none) is created on first use. Pending and approved weeks are locked.
+
 ## Real-time channels
 
 | Channel | Authorised when |
@@ -157,7 +245,7 @@ Removing a member (status `removed`):
 - unassigns their open tasks (completed tasks keep the assignee for history);
 - ends their approval delegations there and hands their waiting approvals on
   (to the other approvers on the step, or to Owners/Admins); their decisions,
-  requests and form responses are kept;
+  requests, form responses and timesheets are kept;
 - keeps their messages, comments, files and activity history;
 - does not touch their memberships in other workspaces;
 - writes an audit event.

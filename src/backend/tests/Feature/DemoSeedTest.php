@@ -3,9 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\Approval\ApprovalRequest;
+use App\Models\Crm\Opportunity;
 use App\Models\Form\Form;
 use App\Models\Form\FormSubmission;
+use App\Models\Helpdesk\Ticket;
 use App\Models\Organization;
+use App\Models\Timesheet\Timesheet;
 use App\Support\Approvals\Approvals;
 use App\Support\Forms\Forms;
 use Database\Seeders\DatabaseSeeder;
@@ -19,6 +22,15 @@ class DemoSeedTest extends TestCase
         $this->seed(DatabaseSeeder::class);
 
         $rakan = Organization::where('slug', 'rakan-tech')->firstOrFail();
+        $sheets = Timesheet::where('organization_id', $rakan->id)->pluck('status')->countBy()->all();
+        $this->assertSame(['approved' => 1, 'draft' => 1, 'pending_approval' => 1, 'returned' => 1], collect($sheets)->sortKeys()->all());
+
+        $tickets = Ticket::where('organization_id', $rakan->id)->pluck('status')->countBy()->sortKeys()->all();
+        $this->assertSame(['in_progress' => 1, 'open' => 1, 'resolved' => 1], $tickets);
+
+        $this->assertSame(6, Opportunity::where('organization_id', $rakan->id)->count());
+        $this->assertSame(1, Opportunity::where('organization_id', $rakan->id)->whereNotNull('lost_reason')->count());
+
         $this->assertSame(4, Form::where('organization_id', $rakan->id)->count());
         $this->assertSame(3, Form::where('organization_id', $rakan->id)->where('status', 'published')->count());
 

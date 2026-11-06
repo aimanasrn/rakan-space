@@ -11,6 +11,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Support\ActivityLog;
 use App\Support\Approvals\Approvals;
+use App\Support\Helpdesk\Helpdesk;
 use App\Support\ReportingLine;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -217,6 +218,8 @@ class MemberController extends Controller
             ->where(fn ($q) => $q->where('delegator_id', $userId)->orWhere('delegate_id', $userId))
             ->whereNull('revoked_at')->where('ends_at', '>', now())->update(['revoked_at' => now()]);
         Approvals::removeMember($organization->id, $userId);
+        // Helpdesk: no longer an agent here; their active tickets go back to the queue.
+        Helpdesk::removeMember($organization->id, $userId);
         // People who reported to this user no longer have a manager here.
         OrganizationMembership::where('organization_id', $organization->id)->where('manager_id', $userId)->update(['manager_id' => null]);
 
