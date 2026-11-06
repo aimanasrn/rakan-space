@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Approval\ApprovalRequest;
+use App\Models\Crm\Opportunity;
 use App\Models\Form\Form;
 use App\Models\Form\FormSubmission;
 use App\Models\Helpdesk\Ticket;
@@ -26,6 +27,9 @@ class DemoSeedTest extends TestCase
 
         $tickets = Ticket::where('organization_id', $rakan->id)->pluck('status')->countBy()->sortKeys()->all();
         $this->assertSame(['in_progress' => 1, 'open' => 1, 'resolved' => 1], $tickets);
+
+        $this->assertSame(6, Opportunity::where('organization_id', $rakan->id)->count());
+        $this->assertSame(1, Opportunity::where('organization_id', $rakan->id)->whereNotNull('lost_reason')->count());
 
         $this->assertSame(4, Form::where('organization_id', $rakan->id)->count());
         $this->assertSame(3, Form::where('organization_id', $rakan->id)->where('status', 'published')->count());

@@ -10,6 +10,10 @@ use App\Models\Approval\ApprovalRequest;
 use App\Models\Approval\ApprovalStepApprover;
 use App\Models\Attachment;
 use App\Models\Conversation;
+use App\Models\Crm\Account as CrmAccount;
+use App\Models\Crm\Activity as CrmActivity;
+use App\Models\Crm\Contact as CrmContact;
+use App\Models\Crm\Opportunity;
 use App\Models\Event;
 use App\Models\Form\Form;
 use App\Models\Form\FormSubmission;
@@ -673,6 +677,118 @@ class Permissions
         $request = $submission->approval_request_id ? ApprovalRequest::find($submission->approval_request_id) : null;
 
         return $request !== null && self::canViewApprovalRequest($user, $request);
+    }
+
+    // ------------------------------------------------------------- Opportunity
+    //
+    // Accounts and contacts are a shared directory for everyone with the app.
+    // An opportunity is visible to its owner, the owner's current reporting
+    // manager, and members with the Opportunity "edit" ability (sales managers;
+    // Owners/Admins by default). Only the owner and "edit" members change it.
+
+    public static function crmAbilities(User $user, int $organizationId): array
+    {
+        return self::membership($user, $organizationId) ? self::appAbilitiesFor($user, $organizationId, 'opportunity') : [];
+    }
+
+    public static function canUseCrm(User $user, int $organizationId): bool
+    {
+        return in_array('view', self::crmAbilities($user, $organizationId), true);
+    }
+
+    public static function canSeeAllOpportunities(User $user, int $organizationId): bool
+    {
+        return in_array('edit', self::crmAbilities($user, $organizationId), true);
+    }
+
+    public static function canCreateCrmRecords(User $user, int $organizationId): bool
+    {
+        return in_array('create', self::crmAbilities($user, $organizationId), true);
+    }
+
+    public static function canManagePipeline(User $user, int $organizationId): bool
+    {
+        return in_array('admin', self::crmAbilities($user, $organizationId), true);
+    }
+
+    public static function canViewOpportunity(User $user, Opportunity $opportunity): bool
+    {
+        if (! self::canUseCrm($user, $opportunity->organization_id)) {
+            return false;
+        }
+
+        return $opportunity->owner_id === $user->id
+            || self::canSeeAllOpportunities($user, $opportunity->organization_id)
+            || ($opportunity->owner_id && ReportingLine::managerOf($opportunity->organization_id, $opportunity->owner_id) === $user->id);
+    }
+
+    public static function canEditOpportunity(User $user, Opportunity $opportunity): bool
+    {
+        return self::canUseCrm($user, $opportunity->organization_id)
+            && ($opportunity->owner_id === $user->id || self::canSeeAllOpportunities($user, $opportunity->organization_id));
+    }
+
+    public static function canDeleteCrmRecords(User $user, int $organizationId): bool
+    {
+        return in_array('delete', self::crmAbilities($user, $organizationId), true);
+    }
+
+    /** SQL twin of canViewOpportunity. */
+    public static function visibleOpportunitiesQuery(User $user, int $organizationId): Builder
+    {
+        $query = Opportunity::query()->where('crm_opportunities.organization_id', $organizationId);
+        if (! self::canUseCrm($user, $organizationId)) {
+            return $query->whereRaw('false');
+        }
+        if (self::canSeeAllOpportunities($user, $organizationId)) {
+            return $query;
+        }
+
+        return $query->where(fn (Builder $q) => $q->where('crm_opportunities.owner_id', $user->id)
+            ->orWhereIn('crm_opportunities.owner_id', self::directReportIdsQuery($user, $organizationId)));
+    }
+
+    public static function canViewAccount(User $user, CrmAccount $account): bool
+    {
+        return self::canUseCrm($user, $account->organization_id);
+    }
+
+    /** Account owner, its creator, or "edit" members. */
+    public static function canEditAccount(User $user, CrmAccount $account): bool
+    {
+        return self::canUseCrm($user, $account->organization_id)
+            && ($account->owner_id === $user->id || $account->created_by === $user->id || self::canSeeAllOpportunities($user, $account->organization_id));
+    }
+
+    public static function canEditContact(User $user, CrmContact $contact): bool
+    {
+        if (! self::canUseCrm($user, $contact->organization_id)) {
+            return false;
+        }
+        if ($contact->created_by === $user->id || self::canSeeAllOpportunities($user, $contact->organization_id)) {
+            return true;
+        }
+        $account = $contact->account_id ? CrmAccount::find($contact->account_id) : null;
+
+        return $account !== null && self::canEditAccount($user, $account);
+    }
+
+    /** Activities follow their opportunity; account-only activities follow the (shared) account. */
+    public static function canViewCrmActivity(User $user, CrmActivity $activity): bool
+    {
+        if ($activity->opportunity_id) {
+            $opportunity = Opportunity::find($activity->opportunity_id);
+
+            return $opportunity !== null && self::canViewOpportunity($user, $opportunity);
+        }
+
+        return self::canUseCrm($user, $activity->organization_id);
+    }
+
+    public static function canEditCrmActivity(User $user, CrmActivity $activity): bool
+    {
+        return self::canViewCrmActivity($user, $activity)
+            && ($activity->user_id === $user->id || self::canSeeAllOpportunities($user, $activity->organization_id));
     }
 
     // ---------------------------------------------------------------- Helpdesk

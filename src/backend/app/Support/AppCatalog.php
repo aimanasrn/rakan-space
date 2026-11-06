@@ -83,6 +83,10 @@ class AppCatalog
         // made agents in Helpdesk settings instead), "delete" = delete tickets,
         // "admin" = settings, agents and canned responses.
         'helpdesk' => ['manager' => ['view', 'create'], 'staff' => ['view', 'create']],
+        // Opportunity: "view" = the shared account/contact directory and your own
+        // opportunities, "create" = add records, "edit" = see and change every
+        // opportunity (sales managers), "delete" = delete records, "admin" = pipeline stages.
+        'opportunity' => ['manager' => ['view', 'create', 'edit'], 'staff' => ['view', 'create']],
     ];
 
     /**

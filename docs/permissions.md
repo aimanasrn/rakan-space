@@ -162,6 +162,35 @@ role to have **view** (otherwise 404).
 - Removing a member removes them as an agent there and sends their active tickets
   back to the queue; their messages and tickets are kept.
 
+### Opportunity (CRM)
+
+All `/crm/*` endpoints require the Opportunity app to be installed and the role
+to have **view** (otherwise 404).
+
+| Ability | Meaning |
+|---|---|
+| view | The shared account/contact directory; your own opportunities |
+| create | Add accounts, contacts and opportunities |
+| edit | Sales manager: see and change **every** opportunity, give deals to others (Managers by default) |
+| delete | Delete accounts, contacts and opportunities (Owners/Admins by default) |
+| admin | Edit pipeline stages |
+
+| Who | Opportunity |
+|---|---|
+| Its owner | See and change |
+| The owner's **current** reporting manager | See (read-only) |
+| **edit** ability | See and change every opportunity |
+| Anyone else | 404 (and not listed, not in the forecast, not on account pages) |
+
+- Accounts and contacts are visible to everyone with the app; they can be edited
+  by their owner/creator and **edit** members.
+- Activities follow their opportunity; activities logged on an account follow the account.
+- Account, contact, stage and owner IDs are resolved inside the workspace. Owners
+  must be active members who can use the app; only **edit** members may give a
+  deal to someone else.
+- Removing a member keeps their opportunities (owner unchanged) for history; a
+  sales manager can hand them over.
+
 ### Timesheet
 
 All `/timesheet/*` endpoints require the Timesheet app to be installed and the

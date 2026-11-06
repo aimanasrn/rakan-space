@@ -178,6 +178,7 @@ class DemoSeeder extends Seeder
         (new FormApprovalDemoSeeder)->rakanTech($org, $this->users);
         (new TimesheetDemoSeeder)->rakanTech($org, $this->users);
         (new HelpdeskDemoSeeder)->rakanTech($org, $this->users);
+        (new CrmDemoSeeder)->rakanTech($org, $this->users);
     }
 
     private function seedKopiKita(): void

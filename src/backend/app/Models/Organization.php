@@ -5,6 +5,11 @@ namespace App\Models;
 use App\Models\Approval\ApprovalDelegation;
 use App\Models\Approval\ApprovalRequest;
 use App\Models\Approval\ApprovalWorkflow;
+use App\Models\Crm\Account as CrmAccount;
+use App\Models\Crm\Activity as CrmActivity;
+use App\Models\Crm\Contact as CrmContact;
+use App\Models\Crm\Opportunity;
+use App\Models\Crm\Stage as CrmStage;
 use App\Models\Form\Form;
 use App\Models\Form\FormSubmission;
 use App\Models\Helpdesk\CannedResponse;
@@ -163,6 +168,33 @@ class Organization extends Model
     public function cannedResponses(): HasMany
     {
         return $this->hasMany(CannedResponse::class);
+    }
+
+    // Opportunity (CRM). Method names match route parameters for scoped bindings.
+
+    public function accounts(): HasMany
+    {
+        return $this->hasMany(CrmAccount::class);
+    }
+
+    public function contacts(): HasMany
+    {
+        return $this->hasMany(CrmContact::class);
+    }
+
+    public function opportunities(): HasMany
+    {
+        return $this->hasMany(Opportunity::class);
+    }
+
+    public function stages(): HasMany
+    {
+        return $this->hasMany(CrmStage::class);
+    }
+
+    public function crmActivities(): HasMany
+    {
+        return $this->hasMany(CrmActivity::class);
     }
 
     /** Route parameter {timesheet}. */

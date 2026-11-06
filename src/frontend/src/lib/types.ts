@@ -651,3 +651,108 @@ export interface HelpdeskSettings {
   auto_close_days: number
   agents: UserSummary[]
 }
+
+// -------------------------------------------------------- Opportunity (CRM)
+
+export type StageKind = "open" | "won" | "lost"
+
+export interface CrmStage {
+  id: number
+  name: string
+  position: number
+  probability: number
+  kind: StageKind
+}
+
+export interface CrmRef {
+  id: number
+  name: string
+}
+
+export interface CrmSummary {
+  can_create: boolean
+  see_all: boolean
+  can_delete: boolean
+  can_manage_pipeline: boolean
+  currency: string
+  stages: CrmStage[]
+  open_tasks: number
+}
+
+export interface CrmOpportunity {
+  id: number
+  name: string
+  amount: number
+  stage_id: number
+  account: CrmRef | null
+  contact: CrmRef | null
+  owner: UserSummary | null
+  expected_close_date: string | null
+  lost_reason: string | null
+  closed_at: string | null
+  position: number
+  updated_at: string | null
+  permissions: { edit: boolean }
+}
+
+export type CrmActivityType = "note" | "call" | "meeting" | "email" | "task"
+
+export interface CrmActivity {
+  id: number
+  type: CrmActivityType
+  subject: string
+  body: string | null
+  due_at: string | null
+  done_at: string | null
+  user: UserSummary | null
+  opportunity: CrmRef | null
+  account: CrmRef | null
+  created_at: string
+  permissions: { edit: boolean }
+}
+
+export interface CrmOpportunityDetail extends CrmOpportunity {
+  description: string | null
+  activities: CrmActivity[]
+  history: { id: number; event: string; actor: string | null; from: string | null; to: string | null; created_at: string }[]
+  permissions: { edit: boolean; delete: boolean; reassign: boolean }
+}
+
+export interface CrmAccount {
+  id: number
+  name: string
+  industry: string | null
+  website: string | null
+  phone: string | null
+  address: string | null
+  notes: string | null
+  owner: UserSummary | null
+  contacts_count: number | null
+  updated_at: string | null
+  permissions: { edit: boolean; delete: boolean }
+}
+
+export interface CrmContact {
+  id: number
+  name: string
+  email: string | null
+  phone: string | null
+  job_title: string | null
+  account: CrmRef | null
+  permissions: { edit: boolean; delete: boolean }
+}
+
+export interface CrmAccountDetail extends CrmAccount {
+  contacts: CrmContact[]
+  opportunities: CrmOpportunity[]
+  activities: CrmActivity[]
+}
+
+export interface CrmForecast {
+  currency: string
+  current_month: string
+  months: { month: string; open_amount: number; weighted_amount: number; won_amount: number; count: number }[]
+  overdue: { open_amount: number; weighted_amount: number; count: number }
+  undated: { open_amount: number; weighted_amount: number; count: number }
+  stages: (CrmStage & { count: number; amount: number })[]
+}

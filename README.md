@@ -93,6 +93,9 @@ Things to try:
 - Sign in as **Daniel** → **Helpdesk** (he is the listed agent): Mei Ling's VPN ticket
   has an internal note she cannot see, and Hafiz's monitor request is unassigned.
   Sign in as **Tan Mei Ling** to see the same ticket from the requester's side.
+- Sign in as **Hafiz** → **Opportunity**: he sees only his Kedai Maju deals. Sign in
+  as **Priya** (his manager) to see the whole pipeline and the forecast; drag a deal
+  to *Won* or *Lost*.
 
 ## Common commands
 
@@ -171,6 +174,10 @@ Things to try:
   insert canned responses, assign, set status/priority/category. SLA targets per
   priority with "due soon"/"missed" alerts, auto-close of resolved tickets, and
   settings for agents, targets and categories.
+- **Opportunity**: shared accounts and contacts, a Kanban pipeline (drag-and-drop
+  or "Move to"), won/lost with a reason, notes/calls/meetings/emails and follow-up
+  tasks, a weighted forecast by month, and editable pipeline stages. Staff see their
+  own deals; reporting managers and sales managers see their team's.
 - **UI**: collapsible sidebar, workspace switcher, Ctrl/⌘+K search,
   notifications menu, profile menu, light/dark themes, mobile navigation,
   loading/empty/error states, confirmations for destructive actions, keyboard

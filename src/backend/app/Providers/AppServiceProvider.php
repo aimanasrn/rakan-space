@@ -8,6 +8,8 @@ use App\Models\AppAccessRequest;
 use App\Models\Approval\ApprovalRequest;
 use App\Models\Approval\ApprovalWorkflow;
 use App\Models\Conversation;
+use App\Models\Crm\Account as CrmAccount;
+use App\Models\Crm\Opportunity;
 use App\Models\Department;
 use App\Models\Event;
 use App\Models\Form\Form;
@@ -74,6 +76,8 @@ class AppServiceProvider extends ServiceProvider
             'timesheet' => Timesheet::class,
             'helpdesk_ticket' => Ticket::class,
             'helpdesk_message' => TicketMessage::class,
+            'crm_account' => CrmAccount::class,
+            'crm_opportunity' => Opportunity::class,
         ]);
 
         // Modules react to approval outcomes (synchronously, inside the same transaction).

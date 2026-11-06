@@ -8,6 +8,10 @@ use App\Http\Controllers\Approval\WorkflowController as ApprovalWorkflowControll
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\ConversationController;
+use App\Http\Controllers\Crm\ActivityController as CrmActivityController;
+use App\Http\Controllers\Crm\DirectoryController as CrmDirectoryController;
+use App\Http\Controllers\Crm\OpportunityController as CrmOpportunityController;
+use App\Http\Controllers\Crm\StageController as CrmStageController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DepartmentController;
 use App\Http\Controllers\EventController;
@@ -271,6 +275,32 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::delete('canned-responses/{cannedResponse}', [HelpdeskCannedResponseController::class, 'destroy']);
                 Route::get('settings', [HelpdeskSettingsController::class, 'show']);
                 Route::put('settings', [HelpdeskSettingsController::class, 'update']);
+            });
+
+            // Opportunity (CRM)
+            Route::prefix('crm')->middleware('app:opportunity')->group(function () {
+                Route::get('summary', [CrmOpportunityController::class, 'summary']);
+                Route::get('forecast', [CrmOpportunityController::class, 'forecast']);
+                Route::get('opportunities', [CrmOpportunityController::class, 'index']);
+                Route::post('opportunities', [CrmOpportunityController::class, 'store']);
+                Route::get('opportunities/{opportunity}', [CrmOpportunityController::class, 'show']);
+                Route::patch('opportunities/{opportunity}', [CrmOpportunityController::class, 'update']);
+                Route::post('opportunities/{opportunity}/move', [CrmOpportunityController::class, 'move']);
+                Route::delete('opportunities/{opportunity}', [CrmOpportunityController::class, 'destroy']);
+                Route::get('accounts', [CrmDirectoryController::class, 'accounts']);
+                Route::post('accounts', [CrmDirectoryController::class, 'storeAccount']);
+                Route::get('accounts/{account}', [CrmDirectoryController::class, 'showAccount']);
+                Route::patch('accounts/{account}', [CrmDirectoryController::class, 'updateAccount']);
+                Route::delete('accounts/{account}', [CrmDirectoryController::class, 'destroyAccount']);
+                Route::get('contacts', [CrmDirectoryController::class, 'contacts']);
+                Route::post('contacts', [CrmDirectoryController::class, 'storeContact']);
+                Route::patch('contacts/{contact}', [CrmDirectoryController::class, 'updateContact']);
+                Route::delete('contacts/{contact}', [CrmDirectoryController::class, 'destroyContact']);
+                Route::get('activities/my-tasks', [CrmActivityController::class, 'myTasks']);
+                Route::post('activities', [CrmActivityController::class, 'store']);
+                Route::patch('activities/{crmActivity}', [CrmActivityController::class, 'update']);
+                Route::delete('activities/{crmActivity}', [CrmActivityController::class, 'destroy']);
+                Route::put('stages', [CrmStageController::class, 'update']);
             });
 
             // Announcements

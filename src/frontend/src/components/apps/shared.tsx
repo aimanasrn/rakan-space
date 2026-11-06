@@ -18,6 +18,7 @@ const APP_STYLE = {
   approval: { icon: "badge-check", gradient: ["#10b981", "#059669"] as [string, string] },
   timesheet: { icon: "clock", gradient: ["#f59e0b", "#ea580c"] as [string, string] },
   helpdesk: { icon: "life-buoy", gradient: ["#ef4444", "#db2777"] as [string, string] },
+  opportunity: { icon: "trending-up", gradient: ["#14b8a6", "#0891b2"] as [string, string] },
 }
 
 /** Page header for module screens: app icon, title, optional back link and actions. */

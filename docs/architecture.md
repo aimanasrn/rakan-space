@@ -147,6 +147,21 @@ Approvals::submitForApproval($organization, $user, 'form_submission', $id, $work
 - If the form has a workflow, each response is submitted with its non-file
   answers as approval `data`, so step conditions can use field keys.
 
+### Opportunity module (`App\Support\Crm\Pipeline`)
+
+- Tables are prefixed `crm_`: stages, accounts, contacts, opportunities, activities.
+  Every reference uses a composite `(id, organization_id)` foreign key.
+- Stages are per organisation (default pipeline created on first use): open stages
+  with a win probability, exactly one **won** and one **lost** stage. Moving into
+  won/lost sets `closed_at`; lost needs a `lost_reason`. Stages with deals cannot
+  be removed or change type.
+- The board loads every visible deal (won/lost from the last 90 days by default);
+  drag-and-drop and a "Move to" menu call `POST /crm/opportunities/{id}/move`.
+- Forecast: open deals by month of expected close, with value × stage probability
+  ("weighted"), plus won value by month closed, from the visible deals only.
+- Follow-up tasks are activities of type `task` with a due date; "My follow-ups"
+  lists the member's open ones. There are no reminders for them yet.
+
 ### Helpdesk module (`App\Support\Helpdesk`)
 
 - `helpdesk_tickets` hold the request (subject, description, priority, category,
