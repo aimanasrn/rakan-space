@@ -244,6 +244,43 @@ class OpportunityTest extends TestCase
         $this->assertSame(['New lead', 'Qualified', 'Demo booked', 'Proposal', 'Won', 'Lost'], $names);
     }
 
+    public function test_activities_follow_their_opportunity_and_author(): void
+    {
+        [$org, $rep, $lead, $salesManager] = $this->team();
+        $colleague = $this->addMember($org, Role::Staff);
+        $id = $this->deal($org, $rep);
+        $note = $this->actingAs($rep)->postJson($this->api($org, '/crm/activities'), ['type' => 'note', 'subject' => 'Budget confirmed', 'opportunity_id' => $id])
+            ->assertCreated()->json('data.id');
+        $url = $this->api($org, "/crm/activities/{$note}");
+
+        // Someone who cannot see the deal gets 404, not 403.
+        $this->actingAs($colleague)->patchJson($url, ['subject' => 'x'])->assertNotFound();
+        $this->actingAs($colleague)->deleteJson($url)->assertNotFound();
+        // The rep's manager sees the deal but cannot change the rep's notes.
+        $this->actingAs($lead)->patchJson($url, ['subject' => 'x'])->assertForbidden();
+        $this->actingAs($lead)->deleteJson($url)->assertForbidden();
+        // A sales manager can.
+        $this->actingAs($salesManager)->patchJson($url, ['subject' => 'Budget confirmed (RM 12k)'])->assertOk();
+
+        // Account-level notes: everyone with the app sees them, only the author or a sales manager edits.
+        $account = $this->actingAs($rep)->postJson($this->api($org, '/crm/accounts'), ['name' => 'Kedai Maju'])->json('data.id');
+        $accountNote = $this->actingAs($rep)->postJson($this->api($org, '/crm/activities'), ['type' => 'note', 'subject' => 'Prefers email', 'account_id' => $account])
+            ->assertCreated()->json('data.id');
+        $this->actingAs($colleague)->patchJson($this->api($org, "/crm/activities/{$accountNote}"), ['subject' => 'x'])->assertForbidden();
+        $this->actingAs($rep)->deleteJson($this->api($org, "/crm/activities/{$accountNote}"))->assertNoContent();
+
+        // Other organisation: its accounts are rejected and its activity IDs are 404.
+        $other = $this->createOrganization(null, 'Other Co');
+        AppCatalog::installDefaults($other, $this->owner($other));
+        $this->actingAs($this->owner($other));
+        $foreignAccount = $this->postJson($this->api($other, '/crm/accounts'), ['name' => 'Theirs'])->json('data.id');
+        $foreignNote = $this->postJson($this->api($other, '/crm/activities'), ['type' => 'note', 'subject' => 'Theirs', 'account_id' => $foreignAccount])->json('data.id');
+        $this->actingAs($rep)->postJson($this->api($org, '/crm/activities'), ['type' => 'note', 'subject' => 'x', 'account_id' => $foreignAccount])
+            ->assertJsonValidationErrors('account_id');
+        $this->actingAs($this->owner($org))->patchJson($this->api($org, "/crm/activities/{$foreignNote}"), ['subject' => 'x'])->assertNotFound();
+        $this->actingAs($this->owner($org))->deleteJson($this->api($org, "/crm/activities/{$foreignNote}"))->assertNotFound();
+    }
+
     public function test_removing_a_member_keeps_their_deals(): void
     {
         [$org, $rep, $lead, $salesManager] = $this->team();

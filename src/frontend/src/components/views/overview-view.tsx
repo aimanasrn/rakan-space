@@ -5,6 +5,7 @@ import { ArrowRight, Bell, CalendarDays, CalendarPlus, FolderKanban, ListChecks,
 import Link from "next/link"
 import { EmptyState, ErrorState, PageHeader, PriorityBadge, TaskStatusBadge, UserAvatar } from "@/components/common"
 import { describeActivity } from "@/components/views/activity-feed"
+import { IdBadge } from "@/components/views/id-badge"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -73,11 +74,14 @@ export function OverviewView() {
 
       {dash.error ? <ErrorState error={dash.error} onRetry={() => dash.refetch()} /> : null}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="My open tasks" value={dash.data?.my_open_tasks_count} icon={ListChecks} link={href("/tasks")} />
-        <StatCard label="Overdue" value={dash.data?.overdue_count} icon={CalendarDays} link={href("/tasks?due=overdue")} tone={dash.data?.overdue_count ? "danger" : undefined} />
-        <StatCard label="Active projects" value={dash.data?.projects.length} icon={FolderKanban} link={href("/projects")} />
-        <StatCard label="Unread notifications" value={dash.data?.unread_notifications_count} icon={Bell} link={href("/notifications")} />
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2">
+          <StatCard label="My open tasks" value={dash.data?.my_open_tasks_count} icon={ListChecks} link={href("/tasks")} />
+          <StatCard label="Overdue" value={dash.data?.overdue_count} icon={CalendarDays} link={href("/tasks?due=overdue")} tone={dash.data?.overdue_count ? "danger" : undefined} />
+          <StatCard label="Active projects" value={dash.data?.projects.length} icon={FolderKanban} link={href("/projects")} />
+          <StatCard label="Unread notifications" value={dash.data?.unread_notifications_count} icon={Bell} link={href("/notifications")} />
+        </div>
+        <IdBadge />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -334,8 +338,8 @@ export function OverviewView() {
 
 function StatCard({ label, value, icon: Icon, link, tone }: { label: string; value?: number; icon: typeof Bell; link: string; tone?: "danger" }) {
   return (
-    <Link href={link} className="group rounded-xl focus-visible:outline-2 focus-visible:outline-ring">
-      <Card className="transition-colors group-hover:border-primary/40">
+    <Link href={link} className="group h-full rounded-xl focus-visible:outline-2 focus-visible:outline-ring">
+      <Card className="h-full justify-center transition-colors group-hover:border-primary/40">
         <CardContent className="flex items-center gap-4">
           <span className={cn("flex size-10 items-center justify-center rounded-lg bg-accent text-accent-foreground", tone === "danger" && "bg-destructive/10 text-destructive")}>
             <Icon className="size-5" aria-hidden />

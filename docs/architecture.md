@@ -200,6 +200,24 @@ Approvals::submitForApproval($organization, $user, 'form_submission', $id, $work
 - `rakanspace:timesheet-reminders` (daily, 09:00) reminds members once about
   past weeks with logged time that were never submitted.
 
+### Leave module (`App\Support\Leave\Leaves`)
+
+- `leave_types` per organisation, created from `Leaves::DEFAULT_TYPES` the first
+  time the app is used (Annual 14, Medical 14, Govt Paid Paternity 7, Business
+  Travel no limit, Calamity 3, Claim Off-in-Lieu 0, Compassionate 3, Marriage 3,
+  Training no limit, Unpaid no limit, Hospitalization 60). `entitlement_days`
+  null = no limit. `leave_entitlements` overrides one member's days for a year.
+- Balances are per calendar year (by start date): **eligible** (override or
+  type default), **taken** (approved), **pending** (pending/returned) and
+  **balance** = eligible − taken. An application cannot span two years.
+- Status: `pending_approval` → `approved` / `rejected` / `returned`, or
+  `cancelled`. Applying calls `Approvals::submitForApproval()` with `days`,
+  `leave_type` and `start_date` as `data`; `SyncLeaveWithApproval` mirrors the
+  request status. A returned application is changed and resubmitted on the same
+  request. Applications are serialised per member (row lock on the membership)
+  so balance and overlap checks cannot race.
+- Public holidays are not excluded yet; only weekends are.
+
 ### Time
 
 - Event times are `timestamptz`, stored in UTC and returned as ISO-8601.

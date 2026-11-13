@@ -19,6 +19,7 @@ use App\Models\Helpdesk\TicketMessage;
 use App\Models\Invitation;
 use App\Models\LauncherApp;
 use App\Models\LauncherBanner;
+use App\Models\Leave\LeaveRequest;
 use App\Models\Message;
 use App\Models\Organization;
 use App\Models\OrganizationMembership;
@@ -28,6 +29,7 @@ use App\Models\TaskComment;
 use App\Models\Timesheet\Timesheet;
 use App\Models\User;
 use App\Support\Forms\SyncSubmissionWithApproval;
+use App\Support\Leave\SyncLeaveWithApproval;
 use App\Support\Timesheets\SyncTimesheetWithApproval;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
@@ -74,6 +76,7 @@ class AppServiceProvider extends ServiceProvider
             'form' => Form::class,
             'form_submission' => FormSubmission::class,
             'timesheet' => Timesheet::class,
+            'leave_request' => LeaveRequest::class,
             'helpdesk_ticket' => Ticket::class,
             'helpdesk_message' => TicketMessage::class,
             'crm_account' => CrmAccount::class,
@@ -83,6 +86,7 @@ class AppServiceProvider extends ServiceProvider
         // Modules react to approval outcomes (synchronously, inside the same transaction).
         EventFacade::listen(ApprovalRequestStatusChanged::class, [SyncSubmissionWithApproval::class, 'handle']);
         EventFacade::listen(ApprovalRequestStatusChanged::class, [SyncTimesheetWithApproval::class, 'handle']);
+        EventFacade::listen(ApprovalRequestStatusChanged::class, [SyncLeaveWithApproval::class, 'handle']);
 
         // Workspaces are addressed by slug in URLs.
         Route::bind('organization', fn (string $value) => Organization::where('slug', $value)->firstOrFail());

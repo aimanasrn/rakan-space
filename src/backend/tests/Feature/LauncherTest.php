@@ -45,7 +45,7 @@ class LauncherTest extends TestCase
 
         $res = $this->actingAs($staff)->getJson($this->api($org, '/launcher'))->assertOk();
 
-        $this->assertSame(['form', 'approval', 'project', 'timesheet', 'helpdesk', 'opportunity', 'lms'], array_column($res->json('data.installed'), 'key'));
+        $this->assertSame(['form', 'approval', 'project', 'timesheet', 'leave', 'helpdesk', 'opportunity', 'lms'], array_column($res->json('data.installed'), 'key'));
         $this->assertSame(['checkin', 'videcard'], array_column($res->json('data.marketplace'), 'key'));
         $this->assertSame(['Live'], array_column($res->json('data.banners'), 'title'));
         // Form: staff fill forms but do not build them by default. Other apps: view + create.
@@ -273,7 +273,7 @@ class LauncherTest extends TestCase
             ->assertJsonPath('data.permissions.manage_apps', true)->json('data.slug');
 
         $res = $this->getJson("/api/orgs/{$slug}/launcher")->assertOk();
-        $this->assertCount(7, $res->json('data.installed'));
+        $this->assertCount(8, $res->json('data.installed'));
         $this->assertCount(2, $res->json('data.marketplace'));
     }
 }

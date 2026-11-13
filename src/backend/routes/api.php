@@ -23,6 +23,8 @@ use App\Http\Controllers\Helpdesk\TicketController as HelpdeskTicketController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\LauncherBannerController;
 use App\Http\Controllers\LauncherController;
+use App\Http\Controllers\Leave\LeaveController;
+use App\Http\Controllers\Leave\SettingsController as LeaveSettingsController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\NotificationController;
@@ -301,6 +303,21 @@ Route::middleware('auth:sanctum')->group(function () {
                 Route::patch('activities/{crmActivity}', [CrmActivityController::class, 'update']);
                 Route::delete('activities/{crmActivity}', [CrmActivityController::class, 'destroy']);
                 Route::put('stages', [CrmStageController::class, 'update']);
+            });
+
+            // Leave
+            Route::prefix('leave')->middleware('app:leave')->group(function () {
+                Route::get('summary', [LeaveController::class, 'summary']);
+                Route::get('calendar', [LeaveController::class, 'calendar']);
+                Route::get('types', [LeaveSettingsController::class, 'types']);
+                Route::get('requests', [LeaveController::class, 'index']);
+                Route::post('requests', [LeaveController::class, 'store']);
+                Route::get('requests/{leaveRequest}', [LeaveController::class, 'show']);
+                Route::put('requests/{leaveRequest}', [LeaveController::class, 'update']);
+                Route::post('requests/{leaveRequest}/cancel', [LeaveController::class, 'cancel']);
+                Route::get('settings', [LeaveSettingsController::class, 'show']);
+                Route::put('settings', [LeaveSettingsController::class, 'update']);
+                Route::put('entitlements', [LeaveSettingsController::class, 'updateEntitlements']);
             });
 
             // Announcements
