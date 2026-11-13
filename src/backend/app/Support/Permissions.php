@@ -21,6 +21,7 @@ use App\Models\Helpdesk\Ticket;
 use App\Models\Helpdesk\TicketMessage;
 use App\Models\LauncherApp;
 use App\Models\LauncherBanner;
+use App\Models\Leave\LeaveRequest;
 use App\Models\Message;
 use App\Models\OrganizationApp;
 use App\Models\OrganizationMembership;
@@ -932,6 +933,73 @@ class Permissions
                 ->whereColumn('project_members.project_id', 'projects.id')
                 ->where('project_members.user_id', $user->id)
                 ->where('project_members.role', 'manager')));
+    }
+
+    // ------------------------------------------------------------------- Leave
+    //
+    // Everyone with the Leave app applies for their own leave and sees the
+    // leave calendar: who is away and when (approved leave of active members).
+    // The leave type, reason and pending applications are visible only to the
+    // applicant, their current reporting manager, participants of the approval
+    // request and members with the Leave app's "admin" ability.
+
+    public static function canUseLeave(User $user, int $organizationId): bool
+    {
+        return self::hasAppAbility($user, $organizationId, 'leave');
+    }
+
+    public static function canAdministerLeave(User $user, int $organizationId): bool
+    {
+        return self::hasAppAbility($user, $organizationId, 'leave', AppAbility::Admin);
+    }
+
+    public static function canViewLeaveRequest(User $user, LeaveRequest $leave): bool
+    {
+        if (! self::canUseLeave($user, $leave->organization_id)) {
+            return false;
+        }
+        if ($leave->user_id === $user->id || self::canAdministerLeave($user, $leave->organization_id)) {
+            return true;
+        }
+        if (ReportingLine::managerOf($leave->organization_id, $leave->user_id) === $user->id) {
+            return true;
+        }
+        $request = $leave->approval_request_id ? ApprovalRequest::find($leave->approval_request_id) : null;
+
+        return $request !== null && self::canViewApprovalRequest($user, $request);
+    }
+
+    /** SQL twin of canViewLeaveRequest. */
+    public static function visibleLeaveRequestsQuery(User $user, int $organizationId): Builder
+    {
+        $query = LeaveRequest::query()->where('leave_requests.organization_id', $organizationId);
+        if (! self::canUseLeave($user, $organizationId)) {
+            return $query->whereRaw('false');
+        }
+        if (self::canAdministerLeave($user, $organizationId)) {
+            return $query;
+        }
+        $approvalAdmin = self::canManageApprovalWorkflows($user, $organizationId);
+
+        return $query->where(fn (Builder $q) => $q
+            ->where('leave_requests.user_id', $user->id)
+            ->orWhereIn('leave_requests.user_id', self::directReportIdsQuery($user, $organizationId))
+            ->when($approvalAdmin, fn (Builder $w) => $w->orWhereNotNull('leave_requests.approval_request_id'))
+            ->orWhereExists(fn ($sub) => $sub->selectRaw('1')->from('approval_step_approvers')
+                ->whereColumn('approval_step_approvers.approval_request_id', 'leave_requests.approval_request_id')
+                ->where(fn ($w) => $w->where('approval_step_approvers.user_id', $user->id)->orWhere('approval_step_approvers.delegated_from', $user->id))));
+    }
+
+    /** A member's balances: the member, their current reporting manager and Leave admins. */
+    public static function canViewLeaveBalances(User $user, int $organizationId, int $memberId): bool
+    {
+        if (! self::canUseLeave($user, $organizationId)) {
+            return false;
+        }
+
+        return $memberId === $user->id
+            || self::canAdministerLeave($user, $organizationId)
+            || ReportingLine::managerOf($organizationId, $memberId) === $user->id;
     }
 
     // ----------------------------------------------------------------- Reports

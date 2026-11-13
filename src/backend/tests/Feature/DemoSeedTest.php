@@ -7,6 +7,7 @@ use App\Models\Crm\Opportunity;
 use App\Models\Form\Form;
 use App\Models\Form\FormSubmission;
 use App\Models\Helpdesk\Ticket;
+use App\Models\Leave\LeaveRequest;
 use App\Models\Organization;
 use App\Models\Timesheet\Timesheet;
 use App\Support\Approvals\Approvals;
@@ -24,6 +25,9 @@ class DemoSeedTest extends TestCase
         $rakan = Organization::where('slug', 'rakan-tech')->firstOrFail();
         $sheets = Timesheet::where('organization_id', $rakan->id)->pluck('status')->countBy()->all();
         $this->assertSame(['approved' => 1, 'draft' => 1, 'pending_approval' => 1, 'returned' => 1], collect($sheets)->sortKeys()->all());
+
+        $leave = LeaveRequest::where('organization_id', $rakan->id)->pluck('status')->countBy()->sortKeys()->all();
+        $this->assertSame(['approved' => 5, 'pending_approval' => 1], $leave);
 
         $tickets = Ticket::where('organization_id', $rakan->id)->pluck('status')->countBy()->sortKeys()->all();
         $this->assertSame(['in_progress' => 1, 'open' => 1, 'resolved' => 1], $tickets);

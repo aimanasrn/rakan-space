@@ -90,6 +90,9 @@ Things to try:
 - Sign in as **Hafiz** → **Timesheet**: this week is in progress, last week is waiting
   for Priya. Sign in as **Priya** → **Approval** to approve it, or **Timesheet → Team**
   and **Reports**. **Tan Mei Ling**'s last week was returned with a comment.
+- Sign in as **Hafiz** → **Leave**: balances per leave type, and an annual leave
+  application waiting for Priya. **Leave calendar** shows who is away; Priya (his
+  manager) also sees the leave types and pending applications.
 - Sign in as **Daniel** → **Helpdesk** (he is the listed agent): Mei Ling's VPN ticket
   has an internal note she cannot see, and Hafiz's monitor request is unassigned.
   Sign in as **Tan Mei Ling** to see the same ticket from the requester's side.
@@ -169,6 +172,12 @@ Things to try:
   configurable workflow (reporting manager by default), return/resubmit,
   withdraw, team view for managers and approvers, reports by project, person,
   task or week with CSV export, and a reminder for unsubmitted weeks.
+- **Leave**: apply for 11 leave types (annual, medical, paternity, business
+  travel, calamity, off-in-lieu, compassionate, marriage, training, unpaid,
+  hospitalization) with eligible / taken / pending / balance per year, half
+  days, approval by the reporting manager, return/resubmit, withdraw or cancel,
+  a monthly leave calendar with the list of people on leave, and admin settings
+  for entitlements (per type and per member).
 - **Helpdesk**: internal service desk. Members raise tickets (with files); agents
   work queues (assigned to me, unassigned, all), reply or add internal notes,
   insert canned responses, assign, set status/priority/category. SLA targets per
@@ -220,7 +229,7 @@ Details: [architecture](docs/architecture.md) · [permission matrix](docs/permis
 
 ## Future scope (not implemented)
 
-Attendance and check-in/out · Leave balances · Expense claims ·
+Attendance and check-in/out · Public holidays for leave · Expense claims ·
 Subscription billing · Guest access · Platform
 administration portal · Native mobile apps · External calendar integrations
 (Google/Microsoft) and recurring events · Voice/video calling.

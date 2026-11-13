@@ -756,3 +756,96 @@ export interface CrmForecast {
   undated: { open_amount: number; weighted_amount: number; count: number }
   stages: (CrmStage & { count: number; amount: number })[]
 }
+
+// -------------------------------------------------------------------- Leave
+
+export type LeaveStatus = "pending_approval" | "approved" | "rejected" | "returned" | "cancelled"
+export type LeaveHalfDay = "none" | "am" | "pm"
+
+export interface LeaveType {
+  id: number
+  key: string
+  name: string
+  /** #rrggbb */
+  color: string
+  /** Days per year; null = no limit. */
+  entitlement_days: number | null
+  is_active: boolean
+}
+
+export interface LeaveBalance {
+  id: number
+  key: string
+  name: string
+  color: string
+  is_active: boolean
+  /** An admin set this member's entitlement for the year. */
+  adjusted: boolean
+  /** null = no limit */
+  eligible: number | null
+  taken: number
+  pending: number
+  /** eligible − taken; null = no limit */
+  balance: number | null
+}
+
+export interface LeaveSummary {
+  year: number
+  today: string
+  user: UserSummary
+  types: LeaveBalance[]
+}
+
+export interface LeaveRequest {
+  id: number
+  user?: UserSummary
+  type?: { id: number; key: string; name: string; color: string }
+  start_date: string
+  end_date: string
+  half_day: LeaveHalfDay
+  days: number
+  reason: string | null
+  status: LeaveStatus
+  approval_request_id: number | null
+  submitted_at: string | null
+  cancelled_at: string | null
+  created_at: string | null
+  permissions: { edit: boolean; cancel: boolean }
+}
+
+export interface LeaveRequestDetail extends LeaveRequest {
+  approval: {
+    id: number
+    status: ApprovalStatus
+    current_step: string | null
+    can_view: boolean
+    comment: string | null
+    decided_by: string | null
+  } | null
+}
+
+export interface LeaveCalendarEntry {
+  id: number
+  user: UserSummary
+  start_date: string
+  end_date: string
+  half_day: LeaveHalfDay
+  days: number
+  status: LeaveStatus
+  /** null when the viewer may only see that the person is away. */
+  type: { id: number; name: string; color: string } | null
+  can_view: boolean
+}
+
+export interface LeaveCalendar {
+  /** YYYY-MM */
+  month: string
+  today: string
+  entries: LeaveCalendarEntry[]
+}
+
+export interface LeaveSettings {
+  workflow_id: number | null
+  workflows: { id: number; name: string; description: string | null; steps_count: number }[]
+  types: LeaveType[]
+}

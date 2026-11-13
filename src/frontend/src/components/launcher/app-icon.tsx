@@ -1,6 +1,7 @@
 import {
   AppWindow,
   BadgeCheck,
+  CalendarDays,
   ClipboardList,
   Clock,
   Contact,
@@ -19,6 +20,7 @@ const ICONS: Record<string, LucideIcon> = {
   "badge-check": BadgeCheck,
   "folder-kanban": FolderKanban,
   clock: Clock,
+  "calendar-days": CalendarDays,
   "life-buoy": LifeBuoy,
   "trending-up": TrendingUp,
   "graduation-cap": GraduationCap,

@@ -410,7 +410,7 @@ function MessagePane({ conversation, me, onJoin }: { conversation: ConversationD
           })}
           {state.pending.map((p) => (
             <li key={p.client_id}>
-              <PendingItem p={p} me={me} onRetry={() => state.retry(p.client_id)} onDiscard={() => state.discard(p.client_id)} />
+              <PendingItem p={p} onRetry={() => state.retry(p.client_id)} onDiscard={() => state.discard(p.client_id)} />
             </li>
           ))}
         </ol>
@@ -471,47 +471,50 @@ function MessageItem({
   return (
     <article
       id={`message-${m.id}`}
-      className={cn("group relative flex gap-3 rounded-md px-2 py-1 hover:bg-muted/50", !grouped && "mt-2", highlighted && "bg-accent/60")}
-      aria-label={`${m.user?.name ?? "Former member"} at ${formatTime(m.created_at, tz)}`}
+      className={cn("group relative flex gap-2 rounded-md px-2 py-0.5", mine && "flex-row-reverse", !grouped && "mt-2", highlighted && "bg-accent/60")}
+      aria-label={`${mine ? "You" : (m.user?.name ?? "Former member")} at ${formatTime(m.created_at, tz)}`}
     >
-      <div className="w-8 shrink-0">{grouped ? null : <UserAvatar user={m.user} />}</div>
-      <div className="min-w-0 flex-1">
+      {/* Other people's messages sit on the left with their avatar; your own sit on the right. */}
+      {mine ? null : <div className="w-8 shrink-0">{grouped ? null : <UserAvatar user={m.user} />}</div>}
+      <div className={cn("flex min-w-0 max-w-[80%] flex-col md:max-w-[70%]", mine ? "items-end" : "items-start", editing && "w-full")}>
         {!grouped ? (
-          <p className="flex items-baseline gap-2">
-            <span className="text-sm font-semibold">{m.user?.name ?? "Former member"}</span>
+          <p className={cn("mb-0.5 flex items-baseline gap-2", mine && "flex-row-reverse")}>
+            <span className="text-sm font-semibold">{mine ? "You" : (m.user?.name ?? "Former member")}</span>
             <time className="text-xs text-muted-foreground" dateTime={m.created_at}>
               {formatTime(m.created_at, tz)}
             </time>
           </p>
         ) : null}
-        {m.parent ? (
-          <p className="mb-1 border-l-2 border-primary/50 pl-2 text-xs text-muted-foreground">
-            <Reply className="mr-1 inline size-3" aria-hidden />
-            {m.parent.deleted ? "Original message deleted" : `${m.parent.user_name ?? "Former member"}: ${m.parent.excerpt ?? ""}`}
-          </p>
-        ) : null}
         {m.deleted ? (
-          <p className="text-sm text-muted-foreground italic">This message was deleted.</p>
+          <p className="rounded-2xl border border-dashed px-3 py-1.5 text-sm text-muted-foreground italic">This message was deleted.</p>
         ) : editing ? (
-          <EditMessage message={m} onDone={onEditDone} />
+          <div className="w-full">
+            <EditMessage message={m} onDone={onEditDone} />
+          </div>
         ) : (
-          <>
+          <div className={cn("max-w-full rounded-2xl px-3 py-1.5", mine ? "rounded-tr-sm bg-primary text-primary-foreground [&_a]:text-primary-foreground" : "rounded-tl-sm bg-muted", grouped && (mine ? "rounded-tr-2xl" : "rounded-tl-2xl"))}>
+            {m.parent ? (
+              <p className={cn("mb-1 border-l-2 pl-2 text-xs", mine ? "border-primary-foreground/60 text-primary-foreground/80" : "border-primary/50 text-muted-foreground")}>
+                <Reply className="mr-1 inline size-3" aria-hidden />
+                {m.parent.deleted ? "Original message deleted" : `${m.parent.user_name ?? "Former member"}: ${m.parent.excerpt ?? ""}`}
+              </p>
+            ) : null}
             {m.body ? (
               <p className="text-sm break-words whitespace-pre-wrap">
                 <RichText text={m.body} highlight={names} />
-                {m.edited ? <span className="ml-1 text-xs text-muted-foreground">(edited)</span> : null}
+                {m.edited ? <span className={cn("ml-1 text-xs", mine ? "text-primary-foreground/70" : "text-muted-foreground")}>(edited)</span> : null}
               </p>
             ) : null}
             {m.attachments.length ? (
-              <div className="mt-1.5">
+              <div className={cn("text-foreground", m.body && "mt-1.5")}>
                 <AttachmentList items={m.attachments} />
               </div>
             ) : null}
-          </>
+          </div>
         )}
       </div>
       {!m.deleted && !editing && (canPost || mine || canModerate) ? (
-        <div className="absolute top-0 right-2 hidden gap-0.5 rounded-md border bg-background p-0.5 shadow-sm group-focus-within:flex group-hover:flex">
+        <div className={cn("absolute top-0 hidden gap-0.5 rounded-md border bg-background p-0.5 shadow-sm group-focus-within:flex group-hover:flex", mine ? "left-2" : "right-2")}>
           {canPost ? (
             <Button variant="ghost" size="icon-xs" onClick={onReply} aria-label="Reply">
               <Reply />
@@ -576,13 +579,14 @@ function EditMessage({ message, onDone }: { message: Message; onDone: (m?: Messa
   )
 }
 
-function PendingItem({ p, me, onRetry, onDiscard }: { p: PendingMessage; me: UserSummary; onRetry: () => void; onDiscard: () => void }) {
+function PendingItem({ p, onRetry, onDiscard }: { p: PendingMessage; onRetry: () => void; onDiscard: () => void }) {
   return (
-    <article className="mt-2 flex gap-3 rounded-md px-2 py-1" aria-label={p.status === "failed" ? "Message failed to send" : "Sending message"}>
-      <UserAvatar user={me} />
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold">{me.name}</p>
-        {p.body ? <p className={cn("text-sm break-words whitespace-pre-wrap", p.status === "sending" && "opacity-60")}>{p.body}</p> : null}
+    <article className="mt-2 flex flex-row-reverse gap-2 rounded-md px-2 py-0.5" aria-label={p.status === "failed" ? "Message failed to send" : "Sending message"}>
+      <div className="flex min-w-0 max-w-[80%] flex-col items-end md:max-w-[70%]">
+        <p className="mb-0.5 text-sm font-semibold">You</p>
+        {p.body ? (
+          <p className={cn("rounded-2xl rounded-tr-sm bg-primary px-3 py-1.5 text-sm break-words whitespace-pre-wrap text-primary-foreground", p.status === "sending" && "opacity-60")}>{p.body}</p>
+        ) : null}
         {p.attachments.length ? (
           <div className="mt-1 flex flex-wrap gap-2 opacity-70">
             {p.attachments.map((a) => (

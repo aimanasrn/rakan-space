@@ -14,6 +14,7 @@ use App\Models\Form\Form;
 use App\Models\Form\FormSubmission;
 use App\Models\Helpdesk\CannedResponse;
 use App\Models\Helpdesk\Ticket;
+use App\Models\Leave\LeaveRequest;
 use App\Models\Timesheet\Timesheet;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -195,6 +196,12 @@ class Organization extends Model
     public function crmActivities(): HasMany
     {
         return $this->hasMany(CrmActivity::class);
+    }
+
+    /** Route parameter {leaveRequest}. */
+    public function leaveRequests(): HasMany
+    {
+        return $this->hasMany(LeaveRequest::class);
     }
 
     /** Route parameter {timesheet}. */

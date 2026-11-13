@@ -41,6 +41,11 @@ class AppCatalog
             'tagline' => 'Weekly time tracking',
             'description' => 'Log hours per project and task, submit your week for approval and report on utilisation.',
         ],
+        'leave' => [
+            'name' => 'Leave', 'icon' => 'calendar-days', 'gradient' => ['#06b6d4', '#2563eb'], 'category' => 'People', 'default' => true,
+            'tagline' => 'Leave applications and balances',
+            'description' => 'Apply for leave, track eligible, taken and balance days per leave type, and see who is away on the leave calendar.',
+        ],
         'helpdesk' => [
             'name' => 'Helpdesk', 'icon' => 'life-buoy', 'gradient' => ['#ef4444', '#db2777'], 'category' => 'Service', 'default' => true,
             'tagline' => 'Tickets, SLAs and knowledge base',
@@ -78,6 +83,10 @@ class AppCatalog
         // Timesheet: "view" = log and submit your own time; "admin" = every sheet,
         // workspace-wide reports and settings. Managers see their direct reports anyway.
         'timesheet' => ['manager' => ['view'], 'staff' => ['view']],
+        // Leave: "view" = apply for your own leave and see the leave calendar;
+        // "admin" = every application, leave types, entitlements and settings.
+        // Managers see their direct reports' leave anyway.
+        'leave' => ['manager' => ['view'], 'staff' => ['view']],
         // Helpdesk: "view" = see your own tickets, "create" = raise tickets,
         // "edit" = work every ticket as an agent (usually chosen people are
         // made agents in Helpdesk settings instead), "delete" = delete tickets,

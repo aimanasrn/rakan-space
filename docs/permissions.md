@@ -222,6 +222,38 @@ role to have **view** (otherwise 404).
   a "Timesheet approval" workflow (reporting manager, admin cover when there is
   none) is created on first use. Pending and approved weeks are locked.
 
+### Leave
+
+All `/leave/*` endpoints require the Leave app to be installed and the role to
+have **view** (otherwise 404).
+
+| Ability | Meaning |
+|---|---|
+| view | Apply for your own leave, see your balances and the leave calendar; see your team's applications (below) |
+| admin | See every application (**All applications**), change leave types and default entitlements, set a member's entitlement for a year, choose the approval workflow |
+
+| Who | Can see an application (type, reason, status) and a member's balances |
+|---|---|
+| The applicant | Always; only the applicant changes (when returned), withdraws or cancels it |
+| The applicant's **current** reporting manager | Yes |
+| Participants of its approval request (and Approval admins) | The application (not the balances) |
+| Leave **admin** ability (Owners/Admins by default) | Everything |
+| Anyone else | 404 |
+
+- **Leave calendar**: everyone with the app sees *who* is away and *when*
+  (approved leave of active members). The leave type is shown only where the
+  viewer may see the application; everyone else sees "On leave". Applications
+  still waiting for a decision appear only for people who may see them.
+- Leave type IDs and member IDs from the client are resolved inside the
+  organisation; another workspace's IDs get a validation error (or 404 for
+  applications).
+- Applications count working days (Mon–Fri); a single day can be a half day.
+  Days must fit the balance for that year, counting other applications still
+  waiting for a decision. Overlapping applications are rejected (except a
+  morning and an afternoon half day on the same date).
+- Approved leave can be cancelled by the applicant only before it starts; their
+  reporting manager is notified.
+
 ## Real-time channels
 
 | Channel | Authorised when |
